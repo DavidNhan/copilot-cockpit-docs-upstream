@@ -2,116 +2,107 @@
 
 ## 1. Betriebsmodell
 
-Das Quell-Repo `C:\temp\copilot-cockpit` wird als **statische Website** betrieben. Es gibt keinen Laufzeitserver mit eigener Fachlogik; der operative Fokus liegt daher auf:
+Das Quell-Repo wird als **statische Website** betrieben. Operativ entscheidend sind deshalb nicht Deploy-Artefakte, sondern:
 
-1. korrekten statischen Artefakten
-2. unverletzten JSON-Katalogen
-3. funktionierenden CDN-Abhaengigkeiten
-4. sinnvollen Cache-Regeln
+1. gueltige HTML-/JS-/CSS-Dateien
+2. konsistente JSON-Kataloge
+3. intakte externe CDN-Abhaengigkeiten
+4. realistische Cache-Erwartungen
 
-## 2. Deployment-Grundlagen
+## 2. Verifizierter Deployment-Vertrag
 
-| Bereich | Stand |
-|---|---|
-| Plattform | Vercel |
-| `framework` | `null` |
-| `buildCommand` | leer |
-| `outputDirectory` | `.` |
-| Daten-Caching | `/data/*` fuer 1 Stunde, `must-revalidate` |
-| JS/CSS-Caching | 1 Stunde, `must-revalidate` |
-| Medien-Caching | 1 Jahr, `immutable` |
+`vercel.json` belegt:
 
-### Operative Konsequenzen
+| Einstellung | Wert | Bedeutung |
+| --- | --- | --- |
+| `framework` | `null` | kein Framework-spezifischer Buildmodus |
+| `buildCommand` | leer | kein Build-Schritt im Repo konfiguriert |
+| `outputDirectory` | `.` | Root-Dateien werden direkt ausgeliefert |
+| Header fuer `/data/*` | `public, max-age=3600, must-revalidate` | Datenaktualisierungen koennen bis zu 1 Stunde gecacht werden |
+| Header fuer `/*.js` und `/*.css` | `public, max-age=3600, must-revalidate` | Runtime- und Stil-Aenderungen sind nicht instant ungecached |
+| Header fuer `/media/*` | `public, max-age=31536000, immutable` | Medien brauchen strenge Dateidisziplin |
 
-| Beobachtung | Folge |
-|---|---|
-| kein Build-Schritt | Releases koennen an Daten- oder Inhaltsfehlern scheitern, nicht an Bundling |
-| `/data/*` wird gecacht | Content-Refresh ist nicht immer instant sichtbar |
-| Medien sind stark gecacht | neue GIFs oder Assets brauchen konsequente Dateipflege und Versionsdisziplin |
+## 3. Externe Laufzeitabhaengigkeiten
 
-## 3. Lokaler Betrieb
+| Abhaengigkeit | Beobachteter Einsatz | Risiko bei Ausfall |
+| --- | --- | --- |
+| Google Fonts | Typografie in Seiten-Head-Sektionen | Layout-/Branding-Abweichungen |
+| Mermaid CDN | Diagramme in mehreren Perspektiven | Diagramme fehlen oder rendern nicht |
+| Prism CDN | Syntax-Highlighting im Cockpit | Codebloecke bleiben funktional, aber weniger lesbar |
+| Vercel Insights Skripte | am Seitenende eingebunden | keine Einflussnahme auf Kernfunktion, aber fehlende Telemetrie |
 
-| Bedarf | Weg |
-|---|---|
-| Seite nur ansehen | einfacher statischer Server |
-| Tests starten | `npm test` startet den Playwright-Webserver automatisch |
-| Produktionsnahe Repro | lokaler Static-Server auf Port 3000 oder Playwright-Webserver |
+## 4. Content-Refresh-Runbook
 
-Praktisch relevant: Playwright nutzt `python3 -m http.server 3000 --bind 127.0.0.1`. Wenn `python3` fehlt, scheitert der Standard-Testpfad bereits vor den eigentlichen Tests.
+```mermaid
+flowchart TD
+    A[Inhalt oder Struktur aendert sich] --> B[Betroffene Kataloge und Konsumenten identifizieren]
+    B --> C[Quell-Repo aktualisieren]
+    C --> D[Passende Playwright-Spezifikationen + integrity.spec.js ausfuehren]
+    D --> E[Cache-Folgen fuer data, js, css oder media abschaetzen]
+    E --> F[Statische Dateien veroeffentlichen]
+    F --> G[Deep Links, Diagramme und Suchziele smoke-testen]
+    G --> H[Technische Doku im Ziel-Repo nachziehen]
+```
 
-## 4. Content-Refresh
+## 5. Typische Aenderungsarten und ihre Betriebsfolgen
 
-### Wann ein Refresh noetig ist
+| Aenderung | Hauptfolgen | Erste Revalidierung |
+| --- | --- | --- |
+| neues oder geaendertes Instrument | Cockpit, Ramp, Wiring, Search, Flight Log, Security | `integrity.spec.js`, `cockpit.spec.js`, betroffene Perspektive |
+| neues/veraendertes Modell | Runway, Tower, Cockpit-EICAS, Search | `runway.spec.js`, `tower.spec.js`, `integrity.spec.js` |
+| neue Governance-Control | Tower, Search, Wiring, Cockpit-Callout | `tower.spec.js`, `integrity.spec.js` |
+| Mermaid-Aenderung | Tower, Security, Wiring oder Runway | betroffene Seitenspezifikation plus visueller Smoke-Test |
+| Medienaenderung unter `media\` | stark gecachte Assets | Dateiname/Pfad und Cache-Verhalten mitdenken |
 
-| Ausloeser | Typische Dateien |
-|---|---|
-| neue Copilot-Funktionen | `copilot-instruments.json`, `known-changelog-entries.json`, `wiring-diagram.json` |
-| neue/veraenderte Modelle | `copilot-models.json`, ggf. Tower-Flight-Plans |
-| neue Governance-/Compliance-Anforderungen | `governance-controls.json`, `sovereign-cloud.json` |
-| neue Security-Erkenntnisse | `security-threats.json`, `security-frameworks.json` |
-| Onboarding-/Guide-Anpassungen | `terminal-guide.json`, `jet-bridge-guide.json`, `preflight-checklist.json` |
+## 6. Cache- und Ausrollhinweise
 
-### Empfohlener Refresh-Ablauf
+### 6.1 JSON, JS und CSS
 
-1. Quelldaten im Quell-Repo aendern.
-2. Cross-Referenzen auf IDs und Deep Links pruefen.
-3. Zielseiten und zugehoerige Specs validieren.
-4. Dokumentation in diesem Repo nachziehen, wenn Strukturen, Zaehler oder Arbeitsweisen betroffen sind.
+- Cache-Horizont: 1 Stunde
+- Verhalten: `must-revalidate`
+- Konsequenz: Nach Deploys koennen Nutzer kurzfristig noch alten Inhalt sehen, vor allem bei Datenkorrekturen.
 
-## 5. Demo- und Medienbetrieb
+### 6.2 Medien
 
-Das Quell-Repo enthaelt einen GitHub-Workflow `record-demos.yml`.
+- Cache-Horizont: 1 Jahr
+- Verhalten: `immutable`
+- Konsequenz: Ersetze Medien nicht stillschweigend unter identischem Pfad, wenn der neue Inhalt sofort sichtbar sein muss.
 
-| Schritt | Bedeutung |
-|---|---|
-| Trigger | Push auf `media/scripts/**` oder `workflow_dispatch` |
-| Tools | `asciinema`, `agg` |
-| Aktion | `./tools/record-demo.sh --all` |
-| Ergebnis | neue/aktualisierte `media/recordings/*.gif` werden automatisch committed |
-
-### Operativer Hinweis
-
-Weil Medien stark gecacht werden, ist dieser Workflow nicht nur Komfort, sondern Teil der konsistenten Auslieferung von Demo-Artefakten.
-
-## 6. Bekannte Risiken
-
-| Risiko | Warum es relevant ist | Typischer Effekt |
-|---|---|---|
-| ID-Brueche in Hub-Katalogen | mehrere Seiten referenzieren dieselben IDs | leere Scanner-Items, kaputte Graphkanten, tote Deep Links |
-| verifikationspflichtige Daten | Modelle und Security-Frameworks markieren sich selbst als noch nicht abschliessend verifiziert | Doku oder UI wirken sicherer als die Quelle ist |
-| duplizierte Navigation/Theme-Logik | kein gemeinsamer Komponentenlayer | einzelne Seiten driften funktional auseinander |
-| CDN-Abhaengigkeiten | Mermaid, Prism, Fonts und Vercel-Skripte liegen ausserhalb des Repos | Diagramme oder Syntax-Highlighting fehlen zur Laufzeit |
-| statische Fehlerbilder | Pflichtdaten werden nur mit seitenlokalen Fallbacks behandelt | Nutzer sehen `DATA LINK LOST`, aber kein zentrales Incident-Handling |
-| veraltete Copy in Kommentaren | einzelne Kommentare nennen aeltere Zaehlerstaende | Review-Konfusion trotz technisch korrekter Daten |
-
-## 7. Beobachtbare Betriebsindikatoren
-
-Da das Repo keinen eigentlichen Backend-Monitoring-Stack mitbringt, sind dies die praktischsten Signale:
-
-| Signal | Woran man es sieht |
-|---|---|
-| Pflichtdaten fehlen | Seite zeigt `DATA LINK LOST` |
-| Mermaid-Probleme | Diagramme fehlen oder fallen auf Text/Fallback zurueck |
-| Deep-Link-Probleme | Blade/Highlight/Scanner oeffnet nicht |
-| Content-Drift | UI-Zaehler, Listenlaengen oder README-Angaben passen nicht mehr zusammen |
-| Testdrift | betroffene Seitenspec oder `integrity.spec.js` bricht |
-
-## 8. Incident-Triage fuer typische Fehler
+## 7. Triage fuer haeufige Stoerbilder
 
 | Symptom | Erste Pruefung | Wahrscheinliche Ursache |
-|---|---|---|
-| Seite bootet, aber Inhalt fehlt | betroffene JSON-Datei vorhanden und gueltig? | kaputte Datei oder falscher Schluessel |
-| nur eine Perspektive kaputt | page-lokales Skript und Zielkatalog ansehen | seitenlokale Renderlogik gebrochen |
-| Wiring- oder Security-Graph defekt | Mermaid und referenzierte Daten pruefen | Diagrammsyntax oder Cross-Reference-Problem |
-| Deep Links ohne Wirkung | Hash-Format und Ziel-ID pruefen | ID-Drift oder fehlender Listener |
-| neue Inhalte erscheinen nicht sofort | Cache-Regeln und Asset-Pfade beachten | erwartbares Cache-Fenster |
+| --- | --- | --- |
+| Seite zeigt `DATA LINK LOST` | existiert die geladene JSON-Datei und ist sie gueltiges JSON? | Pflichtkatalog fehlt oder ist syntaktisch kaputt |
+| nur Suchtreffer fehlen | `search.js`-Quellen und Ziel-IDs pruefen | optionaler Katalog fehlt oder ID-Drift |
+| Diagramm bleibt leer | Mermaid-Quelle und CDN-Erreichbarkeit pruefen | Diagrammsyntax oder CDN-Ausfall |
+| Deep Link oeffnet nichts | Hash-Schema und Ziel-ID pruefen | ID-Drift oder geaenderte Hash-Logik |
+| nur eine Perspektive ist defekt | page-lokales Inline-Skript und Zielkatalog pruefen | isolierter Seitenfehler statt Systemausfall |
 
-## 9. Was im Repo fuer Betrieb nicht explizit belegt ist
+## 8. Betriebsrisiken, die direkt aus dem Repo ableitbar sind
+
+| Risiko | Warum relevant |
+| --- | --- |
+| ID-Brueche in Hub-Katalogen | mehrere Seiten und Tests referenzieren dieselben IDs |
+| verifikationspflichtige Kataloge | Models und Security-Frameworks markieren Unsicherheit explizit selbst |
+| duplizierte Theme-/Boot-Logik | page-lokale Skripte koennen funktional driften |
+| CDN-Abhaengigkeit | statische Site bleibt fuer gewisse Features von externen Skripten abhaengig |
+| fehlender Build-Schritt | viele Probleme schlagen erst zur Laufzeit oder in E2E-Tests auf |
+
+## 9. Was im Repo fuer Betrieb nicht explizit dokumentiert ist
 
 | Thema | Status |
-|---|---|
-| formaler Release-Prozess fuer Produktionsdeploys | nicht explizit dokumentiert |
-| zentrales Observability-/Alerting-Konzept | nicht im Repo belegt |
-| automatisierte Content-Freshness-Pipeline fuer alle Datenkataloge | nicht belegt; nur einzelne Hinweise und Demo-Workflow vorhanden |
+| --- | --- |
+| formaler Deploy-Trigger | nicht im Repo belegt |
+| Rollback-Prozess | nicht im Repo belegt |
+| Alerting / Monitoring ausserhalb des Browsers | nicht im Repo belegt |
+| SLA fuer Content-Aktualitaet | nicht im Repo belegt |
 
-Weiterfuehrend: [`TESTING-GUIDE.md`](TESTING-GUIDE.md), [`DATA-CATALOG.md`](DATA-CATALOG.md), [`CONTRIBUTING.md`](CONTRIBUTING.md)
+Diese Punkte sollten als **Annahme oder Betriebsentscheidung ausserhalb des Repos** behandelt werden.
+
+## 10. Release-Checkliste fuer Maintainer
+
+1. Betroffene Daten-/UI-Dateien im Quell-Repo aendern.
+2. Passende Spezifikationen gemaess [TESTING-GUIDE.md](TESTING-GUIDE.md) auswaehlen.
+3. Hashes, Search-Ziele und Mermaid-Ausgaben gezielt smoke-testen.
+4. Cache-Auswirkungen fuer `data\`, `*.js`, `*.css` und `media\` bewerten.
+5. Technische Doku hier aktualisieren, wenn Architektur, Vertrage, Counts oder Wartungshinweise betroffen sind.

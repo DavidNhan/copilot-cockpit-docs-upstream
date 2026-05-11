@@ -1,68 +1,60 @@
-# Dokumentationsindex
+# Copilot Cockpit - Technische Dokumentation
 
-Diese Dokumentation beschreibt das Quell-Repo `C:\temp\copilot-cockpit` aus Entwickler- und Betreiberperspektive. Fokus ist die **technische Realität**: Seiten, Daten, Fluesse, Tests und Betrieb.
+Diese Dokumentation beschreibt den technischen Stand des Quell-Repositories `C:\temp\copilot-cockpit`. Sie dokumentiert die **reale statische Laufzeit**, die JSON-Vertraege und die Wartungspfade; sie ist kein Produkt-Flyer.
 
-## Schnellueberblick
+## Schnellbild
 
-| Thema | Kernaussage |
-|---|---|
-| App-Typ | Statische Multi-Page-Anwendung |
-| Routing | Dateibasierte Navigation plus Hash-Deep-Links |
-| Datenzugriff | Browser-`fetch()` auf `data\*.json` |
-| Wiederverwendung | `styles.css`, `search.js`, Theme-Persistenz, kopierte Header/Footer |
-| Testen | Playwright E2E plus Integritaetschecks gegen JSON |
-| Deploy | Statisches Output-Verzeichnis `.` mit Vercel-Cache-Regeln |
+| Thema | Verifizierter Stand |
+| --- | --- |
+| Laufzeitmodell | Statische Multi-Page-Webanwendung ohne Backend, Bundler oder Build-Schritt |
+| HTML-Einstiegspunkte | 10 Seiten im Repo-Root (`index.html` plus 9 Perspektiv-/Hilfsseiten) |
+| Gemeinsame Runtime | `app.js` fuer das Cockpit, `search.js` fuer globale Suche, `styles.css` fuer Layout/Theming |
+| Inhaltsquellen | 11 JSON-Dateien unter `data\` |
+| Navigation | Klassische HTML-Links plus Hash-basierte Deep Links |
+| Persistenz | Nur `localStorage`; keine Cookies, keine serverseitige Session |
+| Deployment | Statisches Hosting via `vercel.json` |
+| Automatisierte Tests | Playwright-only: 11 Spezifikationen, 222 Testfaelle |
 
-## Leserpfade
+## Empfohlene Lesepfade
 
-### 1. Fuer neue Maintainer
+| Wenn du ... | Lies zuerst | Dann |
+| --- | --- | --- |
+| das System einordnen willst | [ARCHITECTURE.md](ARCHITECTURE.md) | [API-REFERENCE.md](API-REFERENCE.md) |
+| wissen willst, welche Seite welche Daten liest | [API-REFERENCE.md](API-REFERENCE.md) | [DATA-CATALOG.md](DATA-CATALOG.md) |
+| einen JSON-Katalog aendern willst | [DATA-CATALOG.md](DATA-CATALOG.md) | [TESTING-GUIDE.md](TESTING-GUIDE.md) |
+| Deployment-, Cache- oder Refresh-Folgen abschaetzen willst | [OPERATIONS.md](OPERATIONS.md) | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| Doku- oder Repo-Aenderungen sauber reviewen willst | [CONTRIBUTING.md](CONTRIBUTING.md) | [TESTING-GUIDE.md](TESTING-GUIDE.md) |
 
-1. [`../README.md`](../README.md)
-2. [`ARCHITECTURE.md`](ARCHITECTURE.md)
-3. [`DATA-CATALOG.md`](DATA-CATALOG.md)
-4. [`TESTING-GUIDE.md`](TESTING-GUIDE.md)
+## Systemgrenzen
 
-### 2. Fuer Aenderungen an einer konkreten Seite
+1. **Keine Server-API.** Die "API-Oberflaeche" dieses Repos besteht aus HTML-Routen, JSON-Dateien, URL-Hashes, `localStorage`-Keys und wenigen globalen Browser-Funktionen.
+2. **Kein Shared App-Framework.** `index.html` nutzt `app.js`; alle anderen Seiten booten ueber page-lokale Inline-Skripte und binden `search.js` zusaetzlich ein.
+3. **Datengetriebene UI.** Ein grosser Teil der Funktionalitaet haengt an stabilen IDs in `data\*.json`, nicht an Klassen- oder Komponentenhierarchien.
+4. **Cross-Page-Vertraege sind hart.** `#instrument-<id>`, `#model-<id>`, `#scan=<id>`, `#control=<id>` und `#sovereign=<id>` sind Integrationspunkte fuer Seiten, Suche und Tests.
 
-1. [`API-REFERENCE.md`](API-REFERENCE.md) - Route, DOM-Roots, Deep Links
-2. [`DATA-CATALOG.md`](DATA-CATALOG.md) - welche JSON-Dateien die Seite liest
-3. [`TESTING-GUIDE.md`](TESTING-GUIDE.md) - welche Specs danach Pflicht sind
+## Was als belastbar gilt
 
-### 3. Fuer Architektur- oder Refactoring-Entscheidungen
+Die folgenden Aussagen sind direkt im Quell-Repo belegt:
 
-1. [`ARCHITECTURE.md`](ARCHITECTURE.md)
-2. [`API-REFERENCE.md`](API-REFERENCE.md)
-3. [`OPERATIONS.md`](OPERATIONS.md)
+- `package.json` definiert nur **einen** Automationsskriptpfad: `npm test`.
+- `playwright.config.js` startet dafuer einen lokalen Static Server auf `http://localhost:3000`.
+- `vercel.json` konfiguriert statisches Hosting ohne Build-Schritt und setzt Cache-Header fuer `data\`, `*.js`, `*.css` und `media\`.
+- `app.js` laedt den Cockpit-Katalog hart und weitere Kataloge soft-fail.
+- `search.js` baut einen globalen Index aus Instrumenten, Controls, Modellen und Changelog-Eintraegen.
 
-### 4. Fuer Content-Pflege und Release-Vorbereitung
+## Verifikationshinweise und Unsicherheiten
 
-1. [`DATA-CATALOG.md`](DATA-CATALOG.md)
-2. [`OPERATIONS.md`](OPERATIONS.md)
-3. [`CONTRIBUTING.md`](CONTRIBUTING.md)
-4. [`TESTING-GUIDE.md`](TESTING-GUIDE.md)
+| Bereich | Im Quell-Repo explizit markiert | Bedeutung fuer diese Doku |
+| --- | --- | --- |
+| `data\copilot-models.json` | `verificationRequired: true` | Modellmatrix, Verfuegbarkeiten und Teile der Metadaten sind als Katalogstand zu lesen, nicht als final verifizierte Wahrheit. |
+| `data\security-frameworks.json` | `verificationRequired: true`, viele Eintraege `verified: false` | Framework-Mappings und Ziel-URLs sind dokumentiert, aber bewusst als manuell nachzupruefen gekennzeichnet. |
+| Release-/Ops-Prozess | nicht explizit dokumentiert | Betriebs- und Releasehinweise in dieser Doku bleiben deshalb beim technisch Nachweisbaren und markieren Luecken als Annahme. |
 
-## Dokumente im Detail
+## Dokumentenkarte
 
-| Datei | Wofuer sie da ist | Besonders hilfreich wenn ... |
-|---|---|---|
-| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Systembild, Runtime-Fluesse, Komponenten, Seitenschnitt | du verstehen willst, warum die Anwendung nicht wie eine SPA organisiert ist |
-| [`API-REFERENCE.md`](API-REFERENCE.md) | Referenz fuer HTML-Routen, DOM-Roots, Hash-Kontrakte, Interaktionen | du wissen musst, wo eine Funktion technisch einhaengt |
-| [`DATA-CATALOG.md`](DATA-CATALOG.md) | Vollstaendige JSON-Karte mit Konsumenten und Pflegehinweisen | du Daten aenderst oder neue Inhalte einhaengst |
-| [`TESTING-GUIDE.md`](TESTING-GUIDE.md) | Struktur und Taktik der Playwright-Suite | du Aenderungen verifizieren oder Testumfang zuschneiden willst |
-| [`OPERATIONS.md`](OPERATIONS.md) | Deployment, Cache-Verhalten, Content-Refresh, Risiken | du die Site betreibst oder ein Problem eingrenzt |
-| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Arbeitsregeln fuer Doku- und Codebeitraege | du konsistent beitragen und sauber reviewen willst |
-
-## Wichtige Grundsaetze
-
-1. **Keine Backend-API erfinden.** Die API-Oberflaeche dieses Repos besteht aus HTML-Seiten, JSON-Dateien, Hash-Kontrakten und externen CDN-Skripten.
-2. **Den Hub beachten.** `copilot-instruments.json` ist die wichtigste Referenzdatei fuer mehrere andere Kataloge.
-3. **Verifikation nicht ueberspringen.** Teile des Modells- und Framework-Katalogs markieren sich selbst als noch nicht abschliessend verifiziert.
-4. **Seiten lokal denken.** Viele Muster wiederholen sich, aber die meisten Perspektiven besitzen ihre eigene Renderlogik.
-
-## Wo die Doku bewusst vorsichtig formuliert
-
-| Thema | Warum vorsichtig? |
-|---|---|
-| Modell- und Surface-Aussagen | `copilot-models.json` markiert sich selbst als verifikationspflichtig. |
-| Sicherheits-Framework-Mappings | `security-frameworks.json` enthaelt explizite Hinweise auf manuelle Nachpruefung. |
-| Zaehlerstaende in Kommentaren | Einzelne Tests und Inhaltsdateien enthalten historische Zahlen, die nicht mehr den aktuellen Katalog abbilden. |
+- [ARCHITECTURE.md](ARCHITECTURE.md) - Laufzeitmodell, Seiten-/Skript-Topologie, Datenfluesse, Integrationsvertraege
+- [API-REFERENCE.md](API-REFERENCE.md) - Routen, JSON-Endpunkte, Hash-Kontrakte, Browser-Persistenz
+- [DATA-CATALOG.md](DATA-CATALOG.md) - Datenkataloge, Konsumenten, Kopplungen, Pflegefallen
+- [TESTING-GUIDE.md](TESTING-GUIDE.md) - vorhandene Testbasis, Suite-Zuschnitt, Revalidierung pro Aenderung
+- [OPERATIONS.md](OPERATIONS.md) - Deployment-, Cache-, Refresh- und Triage-Hinweise
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Beitragspfade, Belegstandard, Review-Checklisten, Doku-Synchronisation

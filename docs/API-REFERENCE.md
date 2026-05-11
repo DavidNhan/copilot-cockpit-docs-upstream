@@ -1,160 +1,126 @@
-# API Reference
+# API-Reference
 
 ## 1. Was in diesem Repo "API" bedeutet
 
-Es gibt **keine Backend-API**. Die technische Oberflaeche des Systems besteht aus:
+Es gibt **keine serverseitige API**. Die technische API-Flaeche dieses Repositories besteht aus:
 
-1. HTML-Routen
-2. JSON-Endpunkten unter `data\`
-3. DOM-Entry-Points
-4. URL-Hash-Kontrakten
-5. externen CDN- oder Vercel-Skripten
+1. statischen HTML-Routen
+2. statischen JSON-Endpunkten unter `data\`
+3. URL-Hash-Kontrakten
+4. `localStorage`-Keys
+5. wenigen globalen Browser-Funktionen
 
-## 2. Seiten- und Routenreferenz
+Fuer Architekturkontext siehe [ARCHITECTURE.md](ARCHITECTURE.md).
 
-| Route | Quelle | DOM-Roots / Einstiegspunkte | Datenquellen | Hauptinteraktionen |
-|---|---|---|---|---|
-| `/` oder `/index.html` | `index.html` + `app.js` | `#cockpit-grid`, `#cockpit-legend`, `#detail-panel`, `#search-input` | `copilot-instruments.json` plus optionale Threat-, Governance- und Modelldaten | Zonen-Grid, Filter, lokale Suche, Blade, `#instrument-<id>` |
-| `/terminal.html` | `terminal.html` | `#terminal-main`, `#terminal-plans`, `#terminal-ides`, `#terminal-exercises`, `#terminal-departures` | `terminal-guide.json` | statische Content-Karten, Navigationslinks |
-| `/jet-bridge.html` | `jet-bridge.html` | `#jet-bridge-main`, `#jb-techniques`, `#jb-participants`, `#jb-variables`, `#jb-workflows`, `#jb-patterns` | `jet-bridge-guide.json` | Content-Sections und Pattern-Karten |
-| `/ramp.html` | `ramp.html` | `#ramp-main`, `#ramp-grid`, `#ramp-blade`, `#ramp-blade-body` | `copilot-instruments.json` | Ramp-Filterung, Blade, `#instrument-<id>` |
-| `/runway.html` | `runway.html` | `#runway-main`, `#verification-banner`, `#departure-board`, `#model-blade`, `#topology-diagram`, `#notam-list` | `copilot-models.json` | Provider-/Status-/Plan-Filter, Blade, NOTAM-Links, `#model-<id>` |
-| `/security.html` | `security.html` | `#security-main`, `#luggage-lane`, `#scanner-content`, `#posture-checklist` | `copilot-instruments.json`, `security-threats.json`, `security-frameworks.json` | Scanner, Arrow-Key-Navigation, Posture-Persistenz, `#scan=<id>` |
-| `/tower.html` | `tower.html` | `#tower-main`, `#framework-list`, `#control-list`, `#sovereign-options`, `#flight-plans` | `governance-controls.json`, `copilot-models.json`, `sovereign-cloud.json` | Highlighting, Sovereign-Optionen, Flight Plans, `#control=` / `#sovereign=` |
-| `/flight-log.html` | `flight-log.html` | `#log-stats`, `#log-timeline` | `known-changelog-entries.json` | Timeline-Filter und Instrument-Backlinks |
-| `/preflight.html` | `preflight.html` | `#preflight-main`, `#progress-fill`, `#preflight-categories`, `#reset-btn` | `preflight-checklist.json` | Checkbox-Persistenz und Fortschritt |
-| `/wiring.html` | `wiring.html` | `#wiring-main`, `#wiring-filters`, `#wiring-diagram`, `#wiring-legend`, `#wiring-zones`, `#wiring-stats` | `wiring-diagram.json`, `copilot-instruments.json` | Typfilter, Mermaid-Graph, Klick in Cockpit-Deep-Links |
+## 2. HTML-Routen und ihre Vertraege
 
-## 3. Wichtige JS-Entry-Points
+| Route | Quelldatei | Renderer | Gelesene Daten | Deep Links |
+| --- | --- | --- | --- | --- |
+| `/` und `/index.html` | `index.html` | `app.js` + `search.js` | `copilot-instruments.json`, optional `security-threats.json`, `governance-controls.json`, `copilot-models.json` | konsumiert `#instrument-<id>` |
+| `/terminal.html` | `terminal.html` | Inline-Skript + `search.js` | `terminal-guide.json` | keine page-lokalen Hash-Kontrakte belegt |
+| `/jet-bridge.html` | `jet-bridge.html` | Inline-Skript + `search.js` | `jet-bridge-guide.json` | keine page-lokalen Hash-Kontrakte belegt |
+| `/ramp.html` | `ramp.html` | Inline-Skript + `search.js` | `copilot-instruments.json` | konsumiert und erzeugt `#instrument-<id>` |
+| `/runway.html` | `runway.html` | Inline-Skript + `search.js` | `copilot-models.json` | konsumiert und erzeugt `#model-<id>` |
+| `/tower.html` | `tower.html` | Inline-Skript + `search.js` | `governance-controls.json`, `copilot-models.json`, `sovereign-cloud.json` | konsumiert `#control=<id>` und `#sovereign=<id>` |
+| `/security.html` | `security.html` | Inline-Skript + `search.js` | `copilot-instruments.json`, `security-threats.json`, `security-frameworks.json` | konsumiert und erzeugt `#scan=<id>` |
+| `/flight-log.html` | `flight-log.html` | Inline-Skript + `search.js` | `known-changelog-entries.json` | erzeugt Links nach `index.html#instrument-<id>` |
+| `/preflight.html` | `preflight.html` | Inline-Skript + `search.js` | `preflight-checklist.json` | keine Hash-Kontrakte belegt; nutzt `localStorage` fuer Fortschritt |
+| `/wiring.html` | `wiring.html` | Inline-Skript + `search.js` | `wiring-diagram.json`, `copilot-instruments.json` | erzeugt Links nach `index.html#instrument-<id>` |
 
-| Datei | Rolle | Technischer Vertrag |
-|---|---|---|
-| `app.js` | zentrale Cockpit-Runtime | erwartet `#cockpit-grid`, `#cockpit-legend`, `#detail-panel`, `#search-input` in `index.html` |
-| `search.js` | globale Suche | kann auf mehreren Seiten geladen werden und baut einen eigenen Overlay-Index |
-| page-lokale Inline-Skripte | seitenweises Rendering | erwarten jeweils spezifische Container-IDs der Seite |
+## 3. JSON-Endpunkte
 
-### `app.js` im Detail
+| Endpunkt | Primaere Konsumenten | Kernvertrag | Wartungshinweis |
+| --- | --- | --- | --- |
+| `data\copilot-instruments.json` | Cockpit, Ramp, Security, Wiring, Search | `zones[]`, `plans[]`, `instruments[]` | Instrument-IDs sind globale Referenzanker. |
+| `data\copilot-models.json` | Runway, Tower, Cockpit, Search | `models[]`, `plans[]`, `surfaces[]`, `capabilities[]`, `notams[]`, `flightPlans[]` | Datei markiert sich selbst als verifikationspflichtig. |
+| `data\governance-controls.json` | Tower, Cockpit, Search, Wiring-Integritaet | `sources`, `controls[]` | Control-IDs werden fuer Hashes und Graph-Kanten genutzt. |
+| `data\sovereign-cloud.json` | Tower | `sovereignPillars[]`, `deploymentOptions[]`, `providerStrategies[]`, `residualRisks[]`, `dataFlowDiagram` | Enthaelt auch Mermaid-Quelltext. |
+| `data\security-threats.json` | Security, Cockpit | `schema`, `threats[]` | `threats[].instrumentId` muss auf Instrumente zeigen. |
+| `data\security-frameworks.json` | Security | `sources`, `frameworks`, `cwePattern` | Datei markiert sich explizit als manuell zu verifizieren. |
+| `data\terminal-guide.json` | Terminal | `checkIn`, `boardingPass`, `firstFlight`, `departures` | Single-page-Katalog ohne querreferenzierte IDs. |
+| `data\jet-bridge-guide.json` | Jet Bridge | `promptCraft`, `contextManagement`, `editMode`, `agentPatterns`, `nextSteps` | Page-lokal; geringe Kopplung. |
+| `data\known-changelog-entries.json` | Flight Log, Search, Integritaetstests | `entryTypes`, `entries[]` | `entries[].instruments[]` referenzieren Instrument-IDs. |
+| `data\preflight-checklist.json` | Pre-Flight | `intro`, `categories[]` | Fortschritt liegt nicht in JSON, sondern in `localStorage`. |
+| `data\wiring-diagram.json` | Wiring, Integritaetstests | `connectionTypes[]`, `connections[]`, `zoneDescriptions` | `connections[].from/to` duerfen Instrumente oder Controls adressieren. |
 
-| Bereich | Relevante Aufgaben |
-|---|---|
-| Bootstrap | `DOMContentLoaded`, `Promise.all(...)`, tolerante Zusatzdaten |
-| Rendering | `renderCockpit`, `renderZone`, `renderEngineZone`, `renderFmsZone`, `renderLegend` |
-| Blade | `openDetailPanel`, `closeDetailPanel`, `renderDetailTabs` |
-| Suche/Filter | `initFilters`, `applyFilters`, `initSearch` |
-| Navigation | `handleDeepLink`, `popstate`, `Escape`, Klick auf gedimmten Hauptbereich |
-| Theme | `toggleTheme`, `loadSavedTheme` |
+Fuer Details zu Katalogkopplungen siehe [DATA-CATALOG.md](DATA-CATALOG.md).
 
-### `search.js` im Detail
+## 4. URL-Hash-Kontrakte
 
-| Typ | Quelle | Ziel-URL |
-|---|---|---|
-| `instrument` | `copilot-instruments.json` | `index.html#instrument-<id>` |
-| `control` | `governance-controls.json` | `tower.html#control=<id>` |
-| `model` | `copilot-models.json` | `runway.html#model-<id>` |
-| `changelog` | `known-changelog-entries.json` | `flight-log.html` |
+### 4.1 `#instrument-<id>`
 
-## 4. `fetch()`-Matrix
+| Aspekt | Stand |
+| --- | --- |
+| Konsumenten | `index.html` (`app.js`), `ramp.html` |
+| Produzenten | `app.js`, `ramp.html`, `wiring.html`, `flight-log.html`, `search.js` |
+| Zweck | Oeffnet ein Instrument bzw. springt in dessen Detailansicht |
 
-| Konsument | Fetches | Pflicht / Soft-Fail | Zweck |
-|---|---|---|---|
-| `app.js` | `copilot-instruments.json`, `security-threats.json`, `governance-controls.json`, `copilot-models.json` | Instrumente Pflicht, Rest Soft-Fail | Cockpit-Grid plus Enrichment fuer Security, Tower und EICAS |
-| `search.js` | `copilot-instruments.json`, `governance-controls.json`, `copilot-models.json`, `known-changelog-entries.json` | Instrumente faktisch Kern, Rest Soft-Fail | globaler Suchindex |
-| `terminal.html` | `terminal-guide.json` | Pflicht | Onboarding-Inhalte |
-| `jet-bridge.html` | `jet-bridge-guide.json` | Pflicht | Prompt- und Agent-Guide |
-| `ramp.html` | `copilot-instruments.json` | Pflicht | Ramp-spezifischer Ausschnitt aus dem Instrumentkatalog |
-| `runway.html` | `copilot-models.json` | Pflicht | Model Board, Blade, Topology, NOTAMs |
-| `security.html` | `copilot-instruments.json`, `security-threats.json`, `security-frameworks.json` | alle Pflicht | Threat-Scanner und Framework-Mappings |
-| `tower.html` | `governance-controls.json`, `copilot-models.json`, `sovereign-cloud.json` | alle Pflicht | Controls, Sovereign Cloud, Flight Plans |
-| `flight-log.html` | `known-changelog-entries.json` | Pflicht | Timeline und Stats |
-| `preflight.html` | `preflight-checklist.json` | Pflicht | Checklist-Content |
-| `wiring.html` | `wiring-diagram.json`, `copilot-instruments.json` | beide Pflicht | Graph und Zonen-Metadaten |
+### 4.2 `#model-<id>`
 
-## 5. Hash- und URL-Kontrakte
+| Aspekt | Stand |
+| --- | --- |
+| Konsument | `runway.html` |
+| Produzenten | `runway.html`, `search.js`, `app.js` (EICAS-Links) |
+| Zweck | Oeffnet die Model-Detailansicht auf der Runway-Seite |
 
-| Format | Konsument | Wirkung |
-|---|---|---|
-| `#instrument-<id>` | Cockpit | oeffnet die Detail-Blade via `history.pushState` |
-| `#instrument-<id>` | Ramp | oeffnet die Ramp-Blade |
-| `#model-<id>` | Runway | oeffnet die Model Blade |
-| `#scan=<id>` | Security | waehlt einen Threat im Scanner |
-| `#control=<id>` | Tower | hebt ein Governance-Control hervor und scrollt dorthin |
-| `#sovereign=<id>` | Tower | hebt eine Sovereign-Option hervor und scrollt dorthin |
+### 4.3 `#scan=<id>`
 
-## 6. Relevante Interaktionsvertraege
+| Aspekt | Stand |
+| --- | --- |
+| Konsument | `security.html` |
+| Produzenten | `security.html`, `app.js` |
+| Zweck | Aktiviert den Scanner-Eintrag fuer ein Instrument |
 
-### Cockpit
+### 4.4 `#control=<id>` und `#sovereign=<id>`
 
-| Interaktion | Effekt |
-|---|---|
-| Klick auf `.instrument` | Blade oeffnen |
-| `Escape` | Blade schliessen |
-| Klick auf nicht-instrumentierten Hauptbereich | Blade schliessen |
-| Filterbuttons | Karten dimmen oder aktivieren |
-| Sucheingabe oder `/` | lokale Suche fokussieren |
+| Hash | Konsument | Produzenten | Zweck |
+| --- | --- | --- | --- |
+| `#control=<id>` | `tower.html` | `tower.html`, `search.js`, `app.js` | Hebt eine Governance-Control hervor |
+| `#sovereign=<id>` | `tower.html` | `tower.html` | Hebt eine Sovereign-Cloud-Option hervor |
 
-### Global Search
+## 5. Browser-Persistenz
 
-| Interaktion | Effekt |
-|---|---|
-| `Ctrl+K` / `Cmd+K` | Overlay oeffnen |
-| Pfeiltasten | Treffer wechseln |
-| `Enter` | Zielroute oeffnen |
-| `Escape` | Overlay schliessen |
+| Key | Typ | Verwendet von | Bedeutung |
+| --- | --- | --- | --- |
+| `cockpit-theme` | String (`light` / `dark`) | Cockpit und mehrere Perspektivseiten | globales Theme |
+| `cockpit-last-scan` | String | `security.html` | zuletzt aktiver Scan |
+| `cockpit-security-posture` | JSON-Objekt | `security.html` | Security-Posture-Checkboxzustand |
+| `copilot-preflight` | JSON-Objekt | `preflight.html` | Fortschritt der Checkliste |
 
-### Runway
+## 6. Globale JavaScript-Oberflaeche
 
-| Interaktion | Effekt |
-|---|---|
-| Provider-/Status-Chips | `departure-row`-Elemente dimmen |
-| Auswahl eines Plans | sichtbares/gedimmtes Set neu berechnen |
-| Klick auf Modellzeile, NOTAM-Link oder Alternative-Link | Blade oeffnen bzw. Modell wechseln |
+| Funktion | Quelle | Rolle |
+| --- | --- | --- |
+| `toggleTheme()` | `app.js` | Theme-Toggle auf der Cockpit-Seite |
+| `copyCode(button)` | `app.js` | Kopiert Codeblock-Inhalte aus der Detailansicht |
+| `window.openGlobalSearch()` | `search.js` | Oeffnet die globale Suchpalette |
 
-### Security
+Wichtig: Die meisten Perspektivseiten exportieren **keine** globale API. Ihr Verhalten lebt im jeweiligen Inline-Skript.
 
-| Interaktion | Effekt |
-|---|---|
-| Klick auf Luggage-Item | Scanner neu rendern und Hash setzen |
-| Pfeil links/rechts | naechsten Scan waehlen |
-| Posture-Checkbox | `cockpit-security-posture` aktualisieren und Score neu berechnen |
+## 7. History- und Navigationsverhalten
 
-### Tower
+| Datei | Verifizierter Umgang mit Browser-History |
+| --- | --- |
+| `app.js` | nutzt `history.pushState` und `popstate` fuer Cockpit-Detailpanel |
+| `runway.html` | nutzt `history.replaceState` fuer `#model-<id>` |
+| `security.html` | aktualisiert Hash ueber `history.replaceState` |
+| `ramp.html` | aktualisiert `window.location.hash`, setzt beim Schliessen per `history.replaceState` zurueck |
+| `tower.html` | liest Hashes fuer Highlighting; direkte Hash-Manipulation wird in Tests abgesichert |
 
-| Interaktion | Effekt |
-|---|---|
-| `#control=` | `.control-row.highlight` setzen |
-| `#sovereign=` | `.sovereign-option.highlight` setzen |
-| Framework-Chips | externer Link zu Standards |
+## 8. Cache- und Auslieferungsvertrag
 
-### Wiring
+`vercel.json` definiert folgende Header:
 
-| Interaktion | Effekt |
-|---|---|
-| Filterbutton | Mermaid-Source neu generieren |
-| Klick auf Mermaid-Knoten | Sprung zu `index.html#instrument-<id>` |
+| Pfadklasse | Cache-Control |
+| --- | --- |
+| `/media/*` | `public, max-age=31536000, immutable` |
+| `/*.css` | `public, max-age=3600, must-revalidate` |
+| `/*.js` | `public, max-age=3600, must-revalidate` |
+| `/data/*` | `public, max-age=3600, must-revalidate` |
 
-## 7. Fehlerverhalten
+Folge: Die "API" ist read-only und dateibasiert, aber nicht ungecached.
 
-Die meisten Seiten folgen bei Pflichtdaten demselben Muster:
+## 9. Nicht explizit belegt
 
-```html
-<p style="color:#ff4444;padding:40px;">DATA LINK LOST - ...</p>
-```
-
-Das ist kein globales Error-Framework, sondern eine seitenlokale Fallback-Ausgabe.
-
-## 8. Externe Laufzeitabhaengigkeiten
-
-| Typ | Verwendet fuer |
-|---|---|
-| Mermaid CDN | Diagramme in Cockpit, Runway, Security, Tower, Wiring |
-| Prism CDN | Syntaxhervorhebung in der Cockpit-Blade |
-| Google Fonts | `JetBrains Mono` |
-| `/_vercel/insights/script.js` und `/_vercel/speed-insights/script.js` | Metriken auf mehreren Seiten |
-
-## 9. Was diese Referenz nicht behauptet
-
-1. Keine Aussage ueber serverseitige APIs, weil es keine gibt.
-2. Keine Garantie, dass alle fachlichen Modelldaten aktuell sind; der Katalog markiert sich selbst teilweise als verifikationspflichtig.
-3. Keine automatische Sync-Zusage zwischen Doku-Repo und Quell-Repo; Aenderungen muessen bewusst nachgezogen werden.
-
-Weiterfuehrend: [`ARCHITECTURE.md`](ARCHITECTURE.md), [`DATA-CATALOG.md`](DATA-CATALOG.md)
+1. **Serverseitige Rewrite-/Routing-Regeln.** Im Repo ist nur statisches Root-Serving belegt; weitergehende Plattformlogik ist nicht sichtbar.
+2. **Schreibende Schnittstellen ausserhalb des Repos.** Da keine Write-API im Code existiert, geht diese Doku von read-only Hosting aus; falls externe Systeme Inhalte erzeugen, sind sie hier nicht dokumentiert.

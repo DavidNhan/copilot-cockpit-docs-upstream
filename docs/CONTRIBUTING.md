@@ -1,109 +1,116 @@
 # Contributing
 
-## 1. Beitragspfade kurz erklaert
+## 1. Scope: welches Repo ist gemeint?
 
-Dieses Doku-Repo beschreibt das Quell-Repo `C:\temp\copilot-cockpit`. Deshalb gibt es zwei unterschiedliche Beitragssituationen:
+Diese Dokumentation lebt im Ziel-Repo `C:\temp\copilot-cockpit-docs-final`, beschreibt aber das Quell-Repo `C:\temp\copilot-cockpit`.
 
-| Du willst ... | Arbeite primaer in ... |
-|---|---|
-| nur die Dokumentation verbessern | diesem Repo |
-| Verhalten, Daten oder UI der Site aendern | `C:\temp\copilot-cockpit` |
+| Ziel | Primaerer Arbeitsort |
+| --- | --- |
+| Doku verbessern | dieses Doku-Repo |
+| Verhalten, Daten oder UI der Site aendern | Quell-Repo `C:\temp\copilot-cockpit` |
 | beides synchron halten | zuerst Quell-Repo, dann Doku-Repo |
 
-## 2. Grundregeln
+## 2. Beitragsstandard
 
-1. **Keine Behauptungen ohne Beleg im Quell-Repo.**
-2. **Unsicherheiten explizit benennen**, statt sie weich zu formulieren.
-3. **Dateinamen, IDs und Zaehlerstaende** gegen das Quell-Repo pruefen.
-4. **Hub-Daten respektieren**: `copilot-instruments.json` und `copilot-models.json` haben Seiteneffekte.
+Jede technische Aussage sollte mindestens eine dieser Formen von Beleg haben:
 
-## 3. Stil fuer Doku-Beitraege
+1. direkt lesbarer Code oder Konfiguration
+2. JSON-Struktur im Quell-Repo
+3. vorhandene Playwright-Spezifikation
+4. explizite Repo-Markierung wie `verificationRequired`
+
+Wenn etwas **nicht** explizit belegt ist, benenne es als Annahme oder Luecke.
+
+## 3. Regeln fuer Doku-Aenderungen
 
 | Regel | Erwartung |
-|---|---|
-| Schreibe fuer Maintainer, nicht fuer Marketing | konkret, knapp, handlungsorientiert |
-| Nutze Tabellen, wenn Beziehungen wichtig sind | Routen, Konsumenten, Risiken, Validierung |
-| Vermeide Wiederholungen | einmal sauber erklaeren, dann querverweisen |
-| Markiere Grenzen | z. B. "im Repo nicht explizit belegt" |
-| Bleibe datei- und verhaltensnah | nicht nur "was", sondern auch "wo" und "wodurch" |
+| --- | --- |
+| technische Praezision vor Marketing | beschreibe Dateien, Vertraege, Datenfluesse und Wartungsauswirkungen |
+| Cross-References pflegen | verlinke auf die passende Detaildoku statt Inhalte zu duplizieren |
+| Unsicherheit sichtbar machen | `verificationRequired` und "nicht im Repo belegt" nicht wegformulieren |
+| Pfade und IDs exakt halten | Dateinamen, Hashes, JSON-Schluessel und `localStorage`-Keys muessen stimmen |
+| Wartung mitdenken | nicht nur "was ist da", sondern auch "was bricht, wenn es sich aendert" dokumentieren |
 
-## 4. Stil fuer Code- und Datenbeitraege im Quell-Repo
+## 4. Regeln fuer Quell-Repo-Aenderungen
 
-| Bereich | Erwartung |
-|---|---|
-| JSON | IDs stabil halten, Strukturen konsistent erweitern, Referenzen pruefen |
-| HTML/JS | page-lokale Muster respektieren; keine implizite SPA annehmen |
-| Navigation/Theme | Seitenkonsistenz mitdenken, weil Logik dupliziert ist |
-| Diagramme | Mermaid-Syntax und Ziel-IDs pruefen |
-| Copy | keine alten Zaehlerstaende oder unbewiesenen Aussagen fortschreiben |
+| Bereich | Was besonders zu beachten ist |
+| --- | --- |
+| `data\copilot-instruments.json` | globale IDs, Zonen, `relatedInstruments`, Search, Deep Links |
+| `data\copilot-models.json` | `#model-<id>`, Runway/Tower/Cockpit-Kopplung, Verifikationshinweise |
+| `data\governance-controls.json` | `#control=<id>`, Wiring-Endpunkte, Compliance-Chips |
+| Deep-Link-Logik | Search, Cross-Page-Callouts, Playwright |
+| Mermaid-Inhalte | Syntax plus inhaltliche Referenzziele |
+| page-lokale Skripte | es gibt kein zentrales Framework, daher Driftgefahr zwischen Seiten |
 
-## 5. Review-Checklisten
+## 5. Empfohlener Arbeitsablauf
 
-### Doku-Review
+### 5.1 Bei Doku-only
 
-1. Sind Aussagen gegen `C:\temp\copilot-cockpit` belegbar?
-2. Stimmen Pfade, Dateinamen, Counts und Linkziele?
-3. Gibt es klare Leserpfade und Querverweise?
-4. Werden Unsicherheiten korrekt markiert?
+1. Quell-Repo lesen, nicht raten.
+2. Aussagen gegen Dateien, JSON und Tests verifizieren.
+3. Nur die betroffenen Doku-Dateien aktualisieren.
+4. Querverweise und Annahmen am Ende erneut pruefen.
 
-### Code-/Daten-Review
-
-1. Welche Seiten konsumieren die geaenderte Datei?
-2. Sind IDs, Hash-Ziele und Search-Eintraege weiter konsistent?
-3. Welche Specs sind mindestens noetig?
-4. Muss die Doku nachgezogen werden?
-
-## 6. Empfohlener Arbeitsablauf
-
-### Bei Doku-Only
-
-1. Quell-Repo lesen.
-2. Betroffene Doku-Seiten aktualisieren.
-3. Querverweise pruefen.
-4. Zahlen und Unsicherheiten noch einmal gegenchecken.
-
-### Bei Code-/Daten-Aenderungen
+### 5.2 Bei Code-/Datenaenderungen
 
 1. Aenderung im Quell-Repo umsetzen.
-2. Betroffene Tests laut [`TESTING-GUIDE.md`](TESTING-GUIDE.md) waehlen.
-3. Danach Doku aktualisieren, falls Architektur, API-Flaeche, Datenmodell oder Betriebspfad betroffen sind.
+2. Relevante Tests gemaess [TESTING-GUIDE.md](TESTING-GUIDE.md) waehlen.
+3. Auswirkungen auf Hashes, Search und JSON-Referenzen mitpruefen.
+4. Danach die passende Doku-Datei in diesem Repo nachziehen.
 
-## 7. Was in Reviews oft vergessen wird
+## 6. Welche Doku bei welcher Aenderung aktualisiert werden sollte
 
-| Thema | Warum es gerne uebersehen wird |
-|---|---|
-| Deep Links | sie liegen nicht zentral, sondern pro Seite |
-| Search-Index | `search.js` nutzt mehrere Kataloge quer ueber das Repo |
-| Data-Quality-Hinweise | einzelne Kataloge markieren sich selbst als unvollstaendig verifiziert |
-| Cache-Auswirkungen | statische Aenderungen sind nicht immer sofort sichtbar |
-| veraltete Zaehler in Kommentaren | historische Copy kann sich mit aktuellem Datenstand beissen |
+| Aenderung im Quell-Repo | Doku-Dateien |
+| --- | --- |
+| neue Seite oder neue Route | `API-REFERENCE.md`, oft `ARCHITECTURE.md` |
+| neues Shared-Skript oder veraenderte Runtime-Rolle | `ARCHITECTURE.md`, `API-REFERENCE.md`, ggf. `OPERATIONS.md` |
+| neuer oder geaenderter JSON-Katalog | `DATA-CATALOG.md`, ggf. `API-REFERENCE.md`, `OPERATIONS.md` |
+| neue Hash-Form | `API-REFERENCE.md`, `ARCHITECTURE.md`, ggf. `TESTING-GUIDE.md` |
+| neue Teststrategie / neue Spezifikation | `TESTING-GUIDE.md` |
+| neue Ops-/Cache-/Deploy-Regel | `OPERATIONS.md` |
 
-## 8. Release-Hinweise
+## 7. Review-Checkliste
 
-Dieses Repo dokumentiert keinen vollstaendig formalisierten Release-Prozess. Fuer saubere Auslieferungen sind dennoch diese Punkte sinnvoll:
+### 7.1 Fuer Doku-Reviews
 
-| Vor einem inhaltlichen Release | Vor einem Doku-Release |
-|---|---|
-| betroffene Specs ausfuehren | Pfade, Querverweise, Counts und Schluessel validieren |
-| `verificationRequired`-Hinweise ernst nehmen | keine staerkeren Zusagen als die Quelle machen |
-| Cache-relevante Aenderungen bedenken | Screenshots/Beispiele nicht vom alten Stand uebernehmen |
-| Demo-Artefakte bei Bedarf aktualisieren | Leserpfade aktuell halten |
+1. Ist jede starke Behauptung im Quell-Repo belegbar?
+2. Stimmen Dateinamen, Schluessel, IDs und Hashes exakt?
+3. Werden Unsicherheiten sichtbar statt geglaettet?
+4. Sagt die Doku auch etwas ueber Wartungsauswirkungen aus?
 
-## 9. Gute Commit-/PR-Beschreibungen
+### 7.2 Fuer Code-/Daten-Reviews
 
-Beschreibe nicht nur die Datei, sondern den Vertrag:
+1. Welche Seiten konsumieren die geaenderte Datei?
+2. Welche Hashes oder Search-Ziele haengen daran?
+3. Welche Integritaetsregeln aus `tests\integrity.spec.js` koennen betroffen sein?
+4. Muss die Doku synchron aktualisiert werden?
+
+## 8. Dinge, die in Reviews oft uebersehen werden
+
+| Thema | Warum es leicht uebersehen wird |
+| --- | --- |
+| Search-Ziele | `search.js` kodiert Hash-Ziele selbst und lebt getrennt von Seitenskripten |
+| Cockpit-Callouts | `app.js` verlinkt in Security, Tower und Runway hinein |
+| `verificationRequired` | Daten wirken "strukturiert", sind aber teilweise bewusst noch nicht final bestaetigt |
+| Cache-Folgen | statische Aenderungen sind nicht automatisch sofort sichtbar |
+| page-lokale Theme-/Boot-Logik | kein zentraler Komponentenlayer erzwingt Konsistenz |
+
+## 9. Gute Commit- oder PR-Beschreibungen
+
+Beschreibe bevorzugt den **Vertrag**, nicht nur die Datei:
 
 - welche Seite oder welcher Katalog betroffen ist
-- welche Deep Links, Counts oder Konsumenten sich mitveraendern
-- welche Validierung angewendet wurde
-- ob eine Aussage hart belegt oder bewusst vorsichtig formuliert ist
+- welche IDs, Hashes oder Konsumenten mitbetroffen sind
+- welche Tests oder Quervergleiche die Aussage absichern
+- ob etwas hart belegt oder als Annahme markiert ist
 
-## 10. Wann diese Doku angepasst werden sollte
+## 10. Nicht als Fakt dokumentieren
 
-| Aenderung im Quell-Repo | Doku nachziehen? |
-|---|---|
-| neue Seite / neue Route | ja, `API-REFERENCE.md`, oft auch `ARCHITECTURE.md` |
-| neuer JSON-Katalog | ja, `DATA-CATALOG.md`, oft `OPERATIONS.md` |
-| neue Deep-Link-Form | ja, `API-REFERENCE.md` und ggf. `TESTING-GUIDE.md` |
-| neue Teststrategie oder Workflow | ja, `TESTING-GUIDE.md` oder `OPERATIONS.md` |
-| nur redaktionelle JSON-Copy | meist nein, ausser Counts, Risiken oder Leserpfade aendern sich |
+Vermeide in dieser Doku:
+
+- Annahmen ueber Deploy-Trigger ohne Repo-Beleg
+- "offizielle" Aussagen zu Modellen/Frameworks, wenn die Quelle selbst `verificationRequired` setzt
+- implizite Backend- oder API-Features, die im Code nicht existieren
+- pauschale Aussagen wie "nur redaktionelle Aenderung", wenn IDs, Hashes oder Diagramme betroffen sind
+
+Weiterfuehrend: [ARCHITECTURE.md](ARCHITECTURE.md), [DATA-CATALOG.md](DATA-CATALOG.md), [OPERATIONS.md](OPERATIONS.md)
