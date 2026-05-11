@@ -1,165 +1,129 @@
 # Testing Guide
 
-## 1. Stack
+## 1. Test-Stack
 
-Das Projekt verwendet **ausschliesslich Playwright** fuer automatisierte Tests.
+Das Repository verwendet ausschliesslich Playwright.
 
-| Bestandteil | Wert |
-|---|---|
-| Framework | `@playwright/test` |
-| Konfigurationsdatei | `playwright.config.js` |
-| Testverzeichnis | `tests\` |
-| NPM-Script | `npm test` |
-| Reporter | `list` |
-| Browser-Projekt | `chromium` |
+| Konfiguration | Quelle | Wert |
+| --- | --- | --- |
+| Test-Runner | `C:\temp\copilot-cockpit\package.json` | `npm test` -> `npx playwright test` |
+| Testverzeichnis | `C:\temp\copilot-cockpit\playwright.config.js` | `./tests` |
+| Browserprojekt | `C:\temp\copilot-cockpit\playwright.config.js` | `chromium` |
+| Base URL | `C:\temp\copilot-cockpit\playwright.config.js` | `http://localhost:3000` |
+| Lokaler Server | `C:\temp\copilot-cockpit\playwright.config.js` | `python3 -m http.server 3000 --bind 127.0.0.1` |
+| Reporter | `C:\temp\copilot-cockpit\playwright.config.js` | `list` |
 
-`package.json` definiert kein Build-, Lint- oder Dev-Script; die Tests sind der einzige automatisierte Standard-Entry-Point.
+## 2. Testbefehle
 
-## 2. Startverhalten
-
-`npm test` expandiert zu:
+Aus dem Quell-Repository `C:\temp\copilot-cockpit`:
 
 ```bash
-npx playwright test
-```
-
-Playwright startet dafuer automatisch einen statischen Webserver:
-
-```js
-webServer: {
-    command: 'python3 -m http.server 3000 --bind 127.0.0.1',
-    port: 3000,
-    reuseExistingServer: !process.env.CI,
-}
-```
-
-### Implikationen
-
-1. Das Projekt wird wie eine **statische Website** getestet.
-2. Ein Node- oder App-Server ist nicht erforderlich.
-3. `python3` muss verfuegbar sein.
-
-## 3. Playwright-Konfiguration
-
-| Setting | Wert |
-|---|---|
-| `testDir` | `./tests` |
-| `fullyParallel` | `true` |
-| `forbidOnly` | in CI aktiv |
-| `retries` | `2` in CI, sonst `0` |
-| `workers` | `1` in CI, lokal Standard |
-| `baseURL` | `http://localhost:3000` |
-| `trace` | `on-first-retry` |
-| `screenshot` | `only-on-failure` |
-
-## 4. Coverage nach Spec-Datei
-
-> Hinweis: Die Root-`README.md` nennt 222 Tests. Die aktuellen Spec-Dateien summieren sich jedoch auf **219 Tests**. Fuer die aktuelle Suite sollte daher die Testbasis in `tests\*.spec.js` als maßgeblich gelten.
-
-| Spec | Fokus | Kernaussagen |
-|---|---|---|
-| `tests/cockpit.spec.js` | Cockpit-Grid, Blade, Filter, Suche, Theme | prueft Rendering, Zonen, Tabs, Deep Links, Media, Prism |
-| `tests/flight-log.spec.js` | Flight Log | Timeline, Jahrgruppierung, Filter, Navigation, Theme |
-| `tests/integrity.spec.js` | JSON-Integritaet | Node-only-Checks auf Referenzen und Duplikate |
-| `tests/jet-bridge.spec.js` | Jet Bridge | Prompt-Cards, Kontextkarten, Edit-Workflows, Agent-Patterns |
-| `tests/preflight.spec.js` | Pre-Flight | Kategorien, Checkboxen, LocalStorage, Fortschritt, Reset |
-| `tests/ramp.spec.js` | Ramp | Karten, Blade, Hash-Navigation, Metaphern-Key |
-| `tests/runway.spec.js` | Runway | Filterbar, Departure Board, Model Blade, Mermaid, NOTAMs |
-| `tests/security.spec.js` | Security | X-Ray-Scanner, Threat-Diagramme, Framework-Chips, Posture |
-| `tests/terminal.spec.js` | Terminal | Plaene, IDEs, Uebungen, Weiterleitungslinks |
-| `tests/tower.spec.js` | Tower | Frameworks, Controls, Sovereignty, Flight Plans |
-| `tests/wiring.spec.js` | Wiring | Mermaid-Graph, Filter, Legende, Zonen, Statistiken |
-
-## 5. Testzahlen
-
-| Spec | Anzahl |
-|---|---:|
-| `cockpit.spec.js` | 29 |
-| `flight-log.spec.js` | 15 |
-| `integrity.spec.js` | 9 |
-| `jet-bridge.spec.js` | 17 |
-| `preflight.spec.js` | 13 |
-| `ramp.spec.js` | 15 |
-| `runway.spec.js` | 30 |
-| `security.spec.js` | 35 |
-| `terminal.spec.js` | 17 |
-| `tower.spec.js` | 25 |
-| `wiring.spec.js` | 14 |
-| **Gesamt** | **219** |
-
-## 6. Was die Suite besonders gut absichert
-
-### 6.1 Seitenverhalten
-
-- Initial Rendering fast aller HTML-Seiten
-- aktive Nav-Links
-- Sichtbarkeit zentraler DOM-Strukturen
-- Fehlerfreiheit im Browser-Console-Output
-
-### 6.2 Interaktive UI-Muster
-
-- Blade/Open-Close-Mechanik
-- Filter-Logik
-- Hash-basierte Deep Links
-- Theme-Toggle und Persistenz
-- LocalStorage-basierte Progress-/State-Logik
-
-### 6.3 Datenintegritaet
-
-`integrity.spec.js` prueft fachliche Referenzen direkt gegen Dateien im Dateisystem:
-
-```js
-for (const conn of wiring.connections) {
-    if (!allIds.has(conn.from)) invalid.push(...);
-    if (!allIds.has(conn.to)) invalid.push(...);
-}
-```
-
-Das ist wichtig, weil das Repo stark von Cross-References zwischen JSON-Dateien lebt.
-
-## 7. Beobachtbare Luecken
-
-Die Tests sind stark, aber nicht vollkommen symmetrisch:
-
-1. `integrity.spec.js` prueft nicht jede einzelne JSON-Datei mit demselben Tiefengrad.
-2. Guide-Dateien wie `terminal-guide.json` und `jet-bridge-guide.json` werden primär ueber DOM-Rendering abgesichert.
-3. Externe CDN-Abhaengigkeiten werden indirekt mitgetestet, aber nicht isoliert contract-basiert.
-4. Wegen statischer Architektur gibt es keine separaten Unit-Tests fuer Renderfunktionen in Inline-Scripts.
-
-## 8. Nützliche Einzelkommandos
-
-```bash
-# Gesamte Suite
 npm test
-
-# Einzelne Seite pruefen
-npx playwright test tests/tower.spec.js
-npx playwright test tests/security.spec.js
-npx playwright test tests/runway.spec.js
-
-# Nur Datenintegritaet
-npx playwright test tests/integrity.spec.js
 ```
 
-## 9. Teststrategie fuer Dokumentations- und Datenaenderungen
+Einzelspezifikation:
 
-### Bei JSON-Aenderungen
+```bash
+npx playwright test tests/tower.spec.js
+```
 
-Mindestens sinnvoll:
+Browserinstallation bei neuer Umgebung:
 
-- `tests/integrity.spec.js`
-- die betroffene Seitenspec, z. B.:
-  - `tests/runway.spec.js` fuer `copilot-models.json`
-  - `tests/security.spec.js` fuer `security-threats.json`
-  - `tests/tower.spec.js` fuer `governance-controls.json` oder `sovereign-cloud.json`
+```bash
+npx playwright install chromium
+```
 
-### Bei HTML-/JS-Aenderungen
+## 3. Spezifikationsinventar
 
-Mindestens sinnvoll:
+Die folgenden Zahlen stammen aus den eingecheckten Testdateien (`test(`-Vorkommen):
 
-- betroffene Seitenspec
-- `tests/cockpit.spec.js`, falls `app.js`, `search.js` oder gemeinsame Navigation betroffen ist
+| Spezifikation | Dateipfad | Testfaelle |
+| --- | --- | ---: |
+| Cockpit | `C:\temp\copilot-cockpit\tests\cockpit.spec.js` | 29 |
+| Flight Log | `C:\temp\copilot-cockpit\tests\flight-log.spec.js` | 15 |
+| Integritaet | `C:\temp\copilot-cockpit\tests\integrity.spec.js` | 9 |
+| Jet Bridge | `C:\temp\copilot-cockpit\tests\jet-bridge.spec.js` | 17 |
+| Pre-Flight | `C:\temp\copilot-cockpit\tests\preflight.spec.js` | 13 |
+| Ramp | `C:\temp\copilot-cockpit\tests\ramp.spec.js` | 15 |
+| Runway | `C:\temp\copilot-cockpit\tests\runway.spec.js` | 31 |
+| Security | `C:\temp\copilot-cockpit\tests\security.spec.js` | 37 |
+| Terminal | `C:\temp\copilot-cockpit\tests\terminal.spec.js` | 17 |
+| Tower | `C:\temp\copilot-cockpit\tests\tower.spec.js` | 25 |
+| Wiring | `C:\temp\copilot-cockpit\tests\wiring.spec.js` | 14 |
+| **Summe** |  | **222** |
 
-## 10. Fazit
+## 4. Was die Tests absichern
 
-Die Test-Suite ist fuer ein rein statisches Repo ungewoehnlich tief: Sie sichert nicht nur Rendering, sondern auch **Deep-Link-Vertraege, Persistenz, Datenreferenzen und wichtige fachliche Integrationen**. Gerade fuer dieses Projekt ist das entscheidend, weil Inhalt und Laufzeitverhalten direkt aus JSON-Katalogen erzeugt werden.
+### 4.1 Seiten-Rendering
+
+Alle Perspektivseiten pruefen mindestens:
+
+- seitenweiter Boot ohne relevante JS-Fehler
+- zentrale Landmarken und aktive Navigationslinks
+- rendering der aus JSON geladenen Kernelemente
+
+### 4.2 Hash-Kontrakte
+
+| Vertrag | Testdateien |
+| --- | --- |
+| `#instrument-<id>` | `cockpit.spec.js`, `ramp.spec.js` |
+| `#model-<id>` | `runway.spec.js` |
+| `#scan=<id>` | `security.spec.js` |
+| `#control=<id>`, `#sovereign=<id>` | `tower.spec.js` |
+| Instrument-Deep-Links aus Changelog/Wiring | `flight-log.spec.js`, `wiring.spec.js` |
+
+### 4.3 Client-Persistenz
+
+| Key | Testdateien |
+| --- | --- |
+| `cockpit-theme` | `cockpit.spec.js`, `security.spec.js`, `flight-log.spec.js` |
+| `cockpit-last-scan` | `security.spec.js` |
+| `cockpit-security-posture` | `security.spec.js` |
+| `copilot-preflight` | `preflight.spec.js` |
+
+### 4.4 Datenintegritaet
+
+`tests\integrity.spec.js` ist der wichtigste technische Datenvertrag. Abgesichert werden:
+
+- Referenzen von Changelog-Eintraegen auf Instrumente
+- Referenzen von Wiring-Kanten auf Instrumente/Controls
+- `relatedInstruments`
+- Pflichtfelder pro Instrument
+- gueltige Zonen
+- gueltige Entry- und Connection-Typen
+- doppelte IDs in Instrumenten- und Modellkatalog
+
+## 5. Testdurchfuehrung in dieser Umgebung
+
+Ein frischer Lauf wurde versucht, konnte aber nicht abgeschlossen werden:
+
+- Aufruf: `npm test`
+- Ergebnis: nicht ausgefuehrt
+- Ursache: `pwsh.exe` / PowerShell Core fehlt in der aktuellen Umgebung
+
+Folge fuer diese Dokumentation:
+
+- Die Teststruktur und die Vertragsabdeckung sind belastbar dokumentiert.
+- Ein aktueller PASS/FAIL-Status des kompletten Suites ist **nicht** belegbar.
+
+## 6. Praktische Hinweise fuer lokale Reproduktion
+
+1. Stelle sicher, dass `python3` verfuegbar ist, da Playwright den lokalen Static-Server darueber startet.
+2. Stelle sicher, dass Playwright Chromium installiert hat.
+3. Fuehre Tests im Repository-Root `C:\temp\copilot-cockpit` aus.
+4. Bei Deep-Link-Fehlern zuerst die Hash-Vertraege und die Datenreferenzen in `tests\integrity.spec.js` pruefen.
+
+## 7. Nicht durch Playwright abgedeckte Bereiche
+
+Folgende Bereiche sind zwar vorhanden, aber nicht als eigenstaendige Produktions-Tests im Repository erkennbar:
+
+- `tools\enrich\*` als Offline-Pipeline
+- GitHub-Workflow `C:\temp\copilot-cockpit\.github\workflows\record-demos.yml`
+- Shell-Skript `C:\temp\copilot-cockpit\tools\record-demo.sh`
+
+Diese Bereiche sollten separat verifiziert werden, wenn sie geaendert werden.
+
+## 8. Annahmen
+
+1. **Die 222 Testfaelle sind der aktuelle Stand der eingecheckten Suite.** Diese Zahl stammt aus den Testdateien selbst, nicht aus einem Live-Runner-Report.
+2. **Umgebungsfehler sind von Repository-Fehlern zu trennen.** Das hier beobachtete Problem (`pwsh.exe` fehlt) blockiert die Ausfuehrung, sagt aber nichts ueber die inhaltliche Korrektheit der Tests oder der Anwendung aus.

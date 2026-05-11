@@ -1,145 +1,135 @@
 # API-Reference
 
-## 1. Einordnung
+## 1. API-Oberflaeche des Repositories
 
-Das Repo besitzt **keine klassische HTTP-API mit Backend-Endpoints**. Die "API-Oberflaeche" besteht aus:
+Dieses Repository bietet keine serverseitige JSON- oder RPC-API. Die technische API-Oberflaeche besteht aus:
 
-1. **statischen HTML-Endpunkten**
-2. **statischen JSON-Endpunkten unter `/data/`**
-3. **Hash-basierten Deep-Link-Kontrakten**
-4. **externen CDN-Assets**
+1. statischen HTML-Routen,
+2. statischen JSON-Endpunkten unter `/data/`,
+3. URL-Hash-Kontrakten,
+4. `localStorage`-Keys,
+5. wenigen globalen Browser-Funktionen.
 
-## 2. HTML-Endpunkte
+## 2. HTML-Routen
 
-| Endpoint | Datei | Zweck | Wichtige DOM-Roots |
-|---|---|---|---|
-| `/index.html` bzw. `/` | `index.html` | Haupt-Cockpit | `#cockpit-grid`, `#detail-panel`, `#search-input` |
-| `/terminal.html` | `terminal.html` | Einstieg / Onboarding | `#terminal-main`, `#terminal-plans`, `#terminal-ides` |
-| `/jet-bridge.html` | `jet-bridge.html` | Interaktionsmuster | `#jet-bridge-main`, `#jb-techniques`, `#jb-patterns` |
-| `/ramp.html` | `ramp.html` | Agents / MCP | `#ramp-main`, `#ramp-grid`, `#ramp-blade` |
-| `/runway.html` | `runway.html` | Modellkatalog | `#runway-main`, `#departure-board`, `#model-blade` |
-| `/security.html` | `security.html` | Threat-Modelling | `#security-main`, `#luggage-lane`, `#scanner-content` |
-| `/tower.html` | `tower.html` | Governance / Sovereignty | `#tower-main`, `#control-list`, `#sovereign-cloud-section` |
-| `/flight-log.html` | `flight-log.html` | Changelog | `#log-stats`, `#log-timeline` |
-| `/preflight.html` | `preflight.html` | Checklist | `#preflight-main`, `#preflight-categories` |
-| `/wiring.html` | `wiring.html` | Verbindungsgraph | `#wiring-main`, `#wiring-diagram`, `#wiring-stats` |
+| Route | Dateipfad | Zweck |
+| --- | --- | --- |
+| `/` | `C:\temp\copilot-cockpit\index.html` | Cockpit-Hauptansicht |
+| `/index.html` | `C:\temp\copilot-cockpit\index.html` | Alias fuer Cockpit |
+| `/terminal.html` | `C:\temp\copilot-cockpit\terminal.html` | Einstieg / Plan / IDE / Erstnutzung |
+| `/jet-bridge.html` | `C:\temp\copilot-cockpit\jet-bridge.html` | Prompt- und Agent-Muster |
+| `/ramp.html` | `C:\temp\copilot-cockpit\ramp.html` | Agenten-/MCP-Perspektive |
+| `/runway.html` | `C:\temp\copilot-cockpit\runway.html` | Modellkatalog |
+| `/tower.html` | `C:\temp\copilot-cockpit\tower.html` | Governance und Sovereign Cloud |
+| `/security.html` | `C:\temp\copilot-cockpit\security.html` | Threat Scanner |
+| `/flight-log.html` | `C:\temp\copilot-cockpit\flight-log.html` | Changelog-Timeline |
+| `/preflight.html` | `C:\temp\copilot-cockpit\preflight.html` | Checkliste |
+| `/wiring.html` | `C:\temp\copilot-cockpit\wiring.html` | Verbindungsgraph |
 
-## 3. JSON-Endpunkte
+## 3. JSON-Endpunkte unter `/data/`
 
-| Endpoint | Datei | Konsumenten | Pflicht / Optional |
-|---|---|---|---|
-| `/data/copilot-instruments.json` | `data\copilot-instruments.json` | `app.js`, `ramp.html`, `wiring.html`, `search.js`, `security.html` | Pflicht fuer Cockpit |
-| `/data/copilot-models.json` | `data\copilot-models.json` | `runway.html`, `tower.html`, `app.js`, `search.js` | optional im Cockpit, Pflicht auf Runway/Tower |
-| `/data/governance-controls.json` | `data\governance-controls.json` | `tower.html`, `app.js`, `search.js` | optional im Cockpit |
-| `/data/security-threats.json` | `data\security-threats.json` | `security.html`, `app.js` | optional im Cockpit, Pflicht in Security |
-| `/data/security-frameworks.json` | `data\security-frameworks.json` | `security.html` | Pflicht in Security |
-| `/data/terminal-guide.json` | `data\terminal-guide.json` | `terminal.html` | Pflicht |
-| `/data/jet-bridge-guide.json` | `data\jet-bridge-guide.json` | `jet-bridge.html` | Pflicht |
-| `/data/preflight-checklist.json` | `data\preflight-checklist.json` | `preflight.html` | Pflicht |
-| `/data/known-changelog-entries.json` | `data\known-changelog-entries.json` | `flight-log.html`, `search.js` | Pflicht |
-| `/data/sovereign-cloud.json` | `data\sovereign-cloud.json` | `tower.html` | Pflicht |
-| `/data/wiring-diagram.json` | `data\wiring-diagram.json` | `wiring.html` | Pflicht |
+Alle Daten werden per `GET /data/<datei>.json` geladen. Es existiert keine Schreib-API.
 
-## 4. `fetch()`-Aufrufe nach Datei
+| Endpunkt | Primaere Konsumenten | Top-Level-Vertrag |
+| --- | --- | --- |
+| `/data/copilot-instruments.json` | `app.js`, `ramp.html`, `security.html`, `wiring.html`, `search.js` | `version`, `lastUpdated`, `zones[]`, `plans[]`, `instruments[]` |
+| `/data/copilot-models.json` | `runway.html`, `tower.html`, `app.js`, `search.js` | `$schema`, `version`, `lastUpdated`, `verificationRequired`, `sources[]`, `capabilities[]`, `surfaces[]`, `plans[]`, `models[]`, `notams[]`, `copilotEngine`, `flightPlans[]` |
+| `/data/governance-controls.json` | `tower.html`, `app.js`, `search.js` | `version`, `lastUpdated`, `verificationRequired`, `sources`, `controls[]` |
+| `/data/sovereign-cloud.json` | `tower.html` | `version`, `lastUpdated`, `sovereignPillars[]`, `deploymentOptions[]`, `providerStrategies[]`, `residualRisks[]`, `dataFlowDiagram` |
+| `/data/security-threats.json` | `security.html`, `app.js` | `version`, `lastUpdated`, `schema`, `threats[]` |
+| `/data/security-frameworks.json` | `security.html` | `version`, `lastUpdated`, `verificationRequired`, `sources`, `frameworks`, `cwePattern` |
+| `/data/terminal-guide.json` | `terminal.html` | `version`, `lastUpdated`, `checkIn`, `boardingPass`, `firstFlight`, `departures` |
+| `/data/jet-bridge-guide.json` | `jet-bridge.html` | `version`, `lastUpdated`, `promptCraft`, `contextManagement`, `editMode`, `agentPatterns`, `nextSteps` |
+| `/data/known-changelog-entries.json` | `flight-log.html`, `search.js`, `tests\integrity.spec.js` | `version`, `lastUpdated`, `entryTypes`, `entries[]` |
+| `/data/preflight-checklist.json` | `preflight.html` | `version`, `lastUpdated`, `intro`, `categories[]` |
+| `/data/wiring-diagram.json` | `wiring.html`, `tests\integrity.spec.js` | `version`, `lastUpdated`, `intro`, `connectionTypes[]`, `connections[]`, `zoneDescriptions` |
 
-### 4.1 `app.js`
+## 4. Hash-Kontrakte
 
-```js
-fetch('data/copilot-instruments.json'),
-fetch('data/security-threats.json').catch(() => null),
-fetch('data/governance-controls.json').catch(() => null),
-fetch('data/copilot-models.json').catch(() => null)
-```
+### 4.1 Cockpit-Instrumente
 
-**Bedeutung**
+- Muster: `#instrument-<instrumentId>`
+- Produzenten:
+  - `app.js` beim Oeffnen des Detailpanels
+  - `ramp.html` beim Oeffnen des Ramp-Blades
+  - `wiring.html` in Mermaid-Click-Links
+  - `flight-log.html` in Instrument-Links
+  - `search.js` in globalen Suchtreffern
+- Konsumenten:
+  - `app.js`
+  - `ramp.html`
 
-- `copilot-instruments.json` ist zwingend
-- Threats / Controls / Models sind Soft-Fail-Enrichment
+### 4.2 Modelle
 
-### 4.2 `search.js`
+- Muster: `#model-<modelId>`
+- Produzenten:
+  - `runway.html`
+  - `search.js`
+  - `app.js` fuer EICAS-Links nach Runway
+- Konsument:
+  - `runway.html`
 
-```js
-fetch('data/copilot-instruments.json'),
-fetch('data/governance-controls.json').catch(() => null),
-fetch('data/copilot-models.json').catch(() => null),
-fetch('data/known-changelog-entries.json').catch(() => null)
-```
+### 4.3 Security-Scanner
 
-Die globale Suche erzeugt daraus vier Result-Typen:
+- Muster: `#scan=<instrumentId>`
+- Produzenten:
+  - `security.html`
+  - Cockpit-Callout in `app.js`
+- Konsument:
+  - `security.html`
 
-- `instrument`
-- `control`
-- `model`
-- `changelog`
+### 4.4 Governance und Sovereign Cloud
 
-### 4.3 Page-lokale Fetches
+- Muster:
+  - `#control=<controlId>`
+  - `#sovereign=<optionId>`
+- Produzenten:
+  - `tower.html`
+  - Cockpit-Callout in `app.js`
+  - `search.js` fuer Controls
+- Konsument:
+  - `tower.html`
 
-| Datei | Fetch | Zweck |
-|---|---|---|
-| `terminal.html` | `fetch('data/terminal-guide.json')` | Onboarding-Guide |
-| `jet-bridge.html` | `fetch('data/jet-bridge-guide.json')` | Prompt-/Context-/Edit-Guide |
-| `preflight.html` | `fetch('data/preflight-checklist.json')` | Checklist-Inhalt |
-| `ramp.html` | `fetch('data/copilot-instruments.json')` | Filter auf `perspectives.includes('ramp')` |
-| `runway.html` | `fetch('data/copilot-models.json')` | Model Board und Blade |
-| `security.html` | drei parallele Fetches | Instrumente, Threats, Framework-Registry |
-| `tower.html` | drei parallele Fetches | Controls, Modelle, Sovereignty |
-| `flight-log.html` | `fetch('data/known-changelog-entries.json')` | Timeline |
-| `wiring.html` | zwei parallele Fetches | Connections und Instrument-Metadaten |
+## 5. Browser-Persistenz
 
-## 5. Deep-Link-Vertrag
+| Key | Typ | Semantik |
+| --- | --- | --- |
+| `cockpit-theme` | String (`light` oder `dark`) | Globales Theme ueber alle Seiten |
+| `cockpit-last-scan` | String (`instrumentId`) | Letzter aktiver Security-Scan |
+| `cockpit-security-posture` | JSON-Objekt | Checkbox-Zustand fuer Security-Posture |
+| `copilot-preflight` | JSON-Objekt | Checkbox-Zustand fuer Preflight |
 
-| Format | Beispiel | Konsument | Wirkung |
-|---|---|---|---|
-| `#instrument-<id>` | `index.html#instrument-agent-mode` | `app.js` | oeffnet Cockpit-Detail-Blade |
-| `#instrument-<id>` | `ramp.html#instrument-mcp` | `ramp.html` | oeffnet Ramp-Blade |
-| `#model-<id>` | `runway.html#model-gpt-4-1` | `runway.html` | oeffnet Model-Blade |
-| `#scan=<id>` | `security.html#scan=agent-mode` | `security.html` | aktiviert Threat im X-Ray-Scanner |
-| `#control=<id>` | `tower.html#control=usage-metrics` | `tower.html` | highlightet Governance Control |
-| `#sovereign=<id>` | `tower.html#sovereign=byok-enterprise` | `tower.html` | highlightet Sovereign Option |
+## 6. Globale JavaScript-Funktionen
 
-## 6. Cross-Page-Linking
+| Funktion | Quelle | Zweck |
+| --- | --- | --- |
+| `toggleTheme()` | `app.js` | Theme-Wechsel auf der Cockpit-Seite |
+| `copyCode(button)` | `app.js` | Kopiert Codeblock-Inhalt |
+| `window.openGlobalSearch()` | `search.js` | Oeffnet die globale Suchpalette |
 
-Wichtige interne Linkbeziehungen:
+Hinweis: Die meisten Perspektivseiten kapseln ihre Funktionen im Inline-Skript und exportieren keine globale API.
 
-- Cockpit-Detail -> Security: `security.html#scan=<instrumentId>`
-- Cockpit-Detail -> Tower: `tower.html#control=<instrumentId>`
-- Cockpit-Detail -> Runway: `runway.html`
-- Wiring-Knoten -> Cockpit: `index.html#instrument-<id>`
-- Flight-Log-Eintrag -> Cockpit: `index.html#instrument-<id>`
-- Security-Scanner -> Cockpit: `index.html#instrument-<id>`
+## 7. Cache- und Auslieferungsvertrag
 
-## 7. Externe Laufzeit-Endpoints
+`vercel.json` definiert fuer API-aehnliche Datenzugriffe:
 
-| Typ | URL-Muster | Verwendet in |
-|---|---|---|
-| Mermaid | `https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js` | `index.html`, `runway.html`, `security.html`, `tower.html` |
-| Mermaid ESM | `https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs` | `wiring.html` |
-| Prism | `https://cdn.jsdelivr.net/npm/prismjs@1/...` | `index.html` |
-| Google Fonts | `https://fonts.googleapis.com/...JetBrains+Mono...` | alle Seiten |
-| Vercel Insights | `/_vercel/insights/script.js` | mehrere Seiten |
-| Vercel Speed Insights | `/_vercel/speed-insights/script.js` | mehrere Seiten |
+- `/data/*` -> `Cache-Control: public, max-age=3600, must-revalidate`
+- `/*.js` -> `Cache-Control: public, max-age=3600, must-revalidate`
+- `/*.css` -> `Cache-Control: public, max-age=3600, must-revalidate`
 
-## 8. Cache- und Deploy-Verhalten
+Damit ist die "API" semantisch read-only und dateibasiert.
 
-`vercel.json` definiert:
+## 8. Testbezug pro Vertrag
 
-- `outputDirectory: "."`
-- `.css` und `.js`: `max-age=3600, must-revalidate`
-- `/data/*`: `max-age=3600, must-revalidate`
-- `/media/*`: `max-age=31536000, immutable`
+| Vertrag | Testdateien |
+| --- | --- |
+| `#instrument-<id>` | `tests\cockpit.spec.js`, `tests\ramp.spec.js`, `tests\flight-log.spec.js` |
+| `#model-<id>` | `tests\runway.spec.js` |
+| `#scan=<id>` | `tests\security.spec.js` |
+| `#control=<id>`, `#sovereign=<id>` | `tests\tower.spec.js` |
+| Cross-JSON-Referenzen | `tests\integrity.spec.js` |
 
-Das heisst fuer API-Konsumenten im weiteren Sinn:
+## 9. Annahmen
 
-1. Daten werden direkt statisch ausgeliefert.
-2. JSON-Aenderungen sind innerhalb kurzer Cache-Fenster sichtbar.
-3. Medien koennen aggressiv gecacht werden.
-
-## 9. Fehlerverhalten
-
-Seiten ohne Soft-Fail-Muster ersetzen ihren Hauptcontainer bei Fehlern durch:
-
-```html
-<p style="color:#ff4444;padding:40px;">DATA LINK LOST — ...</p>
-```
-
-Das ist das einheitliche Runtime-Fehlermuster fuer fehlende oder defekte JSON-Dateien.
+1. **Kein externer Schreibzugriff:** Da nur statische Dateien sichtbar sind, wird angenommen, dass Vercel oder ein anderes Hosting keine verdeckte Write-API fuer Inhaltsmutationen bereitstellt.
+2. **JSON ist kanonisch:** Wenn HTML-Text und JSON-Werte abweichen, gilt fuer technische Integration der JSON-Endpunkt als Vertragsquelle.
