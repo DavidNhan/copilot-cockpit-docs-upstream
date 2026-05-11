@@ -1,237 +1,175 @@
 # Architektur
 
-## 1. Architekturmodell
+## 1. Architektur in einem Satz
 
-Copilot Cockpit ist eine **statische, clientseitig gerenderte Multi-Page-Anwendung**:
+Copilot Cockpit ist eine **statische, clientseitig gerenderte Multi-Page-App**, in der jede Perspektive als eigene HTML-Seite mit eigener Renderlogik lebt und JSON-Dateien die Rolle einer kleinen in-repo Content-API uebernehmen.
+
+## 2. Systemmodell
 
 ```text
 Browser
-  -> HTML-Seite laden
-  -> styles.css + search.js + page-spezifisches Script laden
-  -> JSON unter /data/ per fetch() laden
+  -> HTML-Seite oeffnen
+  -> styles.css + optionale CDN-Skripte + search.js laden
+  -> page-lokales Script oder app.js initialisieren
+  -> JSON-Dateien aus /data/ per fetch() laden
   -> DOM rendern
-  -> Hash / localStorage / Theme aktualisieren
+  -> URL-Hash und localStorage fuer Zustand nutzen
 ```
 
-Es existieren:
+### Was es bewusst nicht gibt
 
-- **kein API-Server**
-- **kein Build/Bundle-Schritt**
-- **kein Router im SPA-Sinn**
-- **kein serverseitiges Rendering**
-
-`vercel.json` konfiguriert statisches Hosting und Cache-Header fuer `.css`, `.js`, `media/*` und `data/*`.
-
-## 2. Zentrale Bausteine
-
-### 2.1 Gemeinsame UI-Schicht
-
-| Datei | Rolle |
+| Nicht vorhanden | Konsequenz |
 |---|---|
-| `styles.css` | globales HUD-Styling, responsive Navigation, Light/Dark Theme |
-| `search.js` | globale Command-Palette mit Daten aus Instrumenten, Controls, Modellen und Changelog |
-| Header/Footer in jeder HTML-Datei | wiederkehrende Navigation ueber alle Perspektiven |
+| Backend-Service | Keine serverseitige API, kein Auth-, Session- oder Persistenz-Layer |
+| Build/Bundle-Schritt | Seiten koennen direkt statisch ausgeliefert werden |
+| SPA-Router | Navigation passiert ueber echte HTML-Dateien und page-lokale Hash-Logik |
+| Gemeinsame Komponentenbibliothek | Wiederverwendete Patterns sind kopiert oder per JS-Helper nachgebildet |
 
-Fast jede Seite implementiert ausserdem dasselbe Theme-Muster:
+## 3. Warum die Seiten so organisiert sind
 
-```js
-const saved = localStorage.getItem('cockpit-theme');
-if (saved === 'light') {
-    document.body.classList.add('light-theme');
-}
-```
+Die Seitenstruktur folgt nicht primar technischen Schichten, sondern **fachlichen Blickwinkeln**:
 
-### 2.2 Cockpit-spezifische Runtime
+| Perspektive | Warum als eigene Seite? |
+|---|---|
+| Terminal / Jet Bridge | Lern- und Onboarding-Inhalte sind eher sequentielle Guides als Cockpit-Karten |
+| Cockpit | Zentraler Feature-Hub mit Grid, Blade, Filtern und Deep Links |
+| Ramp / Security / Runway / Tower | Jede Sicht braucht ein eigenes Interaktionsmodell und eine eigene Datenselektion |
+| Flight Log / Pre-Flight / Wiring | Das sind Utility-Perspektiven mit stark abweichender Darstellung |
 
-`index.html` ist die einzige Seite, die `app.js` als externes Laufzeitmodul benutzt. Andere Seiten haben ihre Renderlogik inline im `<script>`-Block.
+Der Vorteil: jede Seite bleibt isoliert, leicht statisch deploybar und fachlich lesbar. Der Preis: Navigation, Theme und Fehlerbilder sind mehrfach implementiert.
 
-Wichtige Zustandsobjekte in `app.js`:
+## 4. Seiten- und Komponentenmodell
 
-- `cockpitData`
-- `allInstruments`
-- `activeFilters`
-- `searchQuery`
-- `scannerIndex`
-- `governanceIndex`
+| Seite | Hauptdatei | Rendering-Modell | Wichtige Komponenten |
+|---|---|---|---|
+| Cockpit | `index.html` + `app.js` | externes Skript | Zonen-Grid, Filterbar, Detail-Blade, Diagramm-/Code-/Media-Tabs |
+| Terminal | `terminal.html` | inline | Plan-Karten, IDE-Setup, Exercises, Next Steps |
+| Jet Bridge | `jet-bridge.html` | inline | Prompt-Techniken, Kontextkarten, Edit-Workflows, Agent-Patterns |
+| Ramp | `ramp.html` | inline | Ramp-Grid, Blade, Perspektivfilter auf Instrumente |
+| Runway | `runway.html` | inline | Verification Banner, Filterbar, Departure Board, Model Blade, Topology, NOTAMs |
+| Security | `security.html` | inline | Luggage Lane, Scanner, Mermaid-Threat-Modell, Posture Checklist |
+| Tower | `tower.html` | inline | Framework-Legende, Control-Liste, Sovereign Cloud, Flight Plans |
+| Flight Log | `flight-log.html` | inline | Timeline, Statistiken, Filter |
+| Pre-Flight | `preflight.html` | inline | Kategorien, Checkboxen, Fortschritt, Reset |
+| Wiring | `wiring.html` | inline | Mermaid-Graph, Filter, Legende, Zonen- und Statistikansicht |
 
-## 3. Seitenarchitektur
+## 5. Laufzeitfluss pro Seite
 
-| Seite | Rendering-Modell | Besondere Komponenten |
+### 5.1 Gemeinsames Muster
+
+1. Theme aus `localStorage['cockpit-theme']` laden.
+2. Seite oder zentrales Skript startet.
+3. JSON-Daten per `fetch()` laden.
+4. DOM rendern.
+5. Hash-State anwenden.
+6. Interaktionen binden.
+
+### 5.2 Cockpit-Flow
+
+`app.js` ist die einzige zentrale Laufzeitdatei fuer eine Seite mit eigenem Modulcharakter.
+
+| Phase | Verhalten |
+|---|---|
+| Bootstrap | laedt `copilot-instruments.json` zwingend und drei Zusatzkataloge tolerant |
+| Enrichment | baut `scannerIndex`, `governanceIndex` und ein `_engineModels`-Fallback fuer die EICAS-Zone |
+| Rendering | rendert Zonen in fester Reihenfolge, inklusive Sonderlogik fuer EICAS und FMS |
+| Interaktion | initialisiert Filter, lokale Suche, Blade, Mermaid und Browser-Back/Forward |
+| Deep Link | `#instrument-<id>` oeffnet die passende Detailansicht |
+
+### 5.3 Perspektiv-spezifische Flows
+
+| Seite | Datenfluss | Besondere Logik |
 |---|---|---|
-| `index.html` | externes Script `app.js` | Grid, Zonen, Detail-Blade, lokale Suche, Prism, Mermaid |
-| `terminal.html` | inline | Check-In, Boarding Pass, First Flight, Departure Board |
-| `jet-bridge.html` | inline | Prompt-Cards, Kontextkarten, Edit-Workflows, Agent-Patterns |
-| `ramp.html` | inline | Instrument-Grid fuer Ramp-Perspektive, Detail-Blade, Hash-Handling |
-| `runway.html` | inline | Filterbar, Departure Board, Modell-Blade, Topologie, NOTAMs |
-| `security.html` | inline | X-Ray-Scanner, Threat-Diagramme, Posture-Score, Compliance-Tabelle |
-| `tower.html` | inline | Framework-Legende, Governance Controls, Sovereign Cloud, Flight Plans |
-| `flight-log.html` | inline | Timeline, Filterbar fuer Entry Type und Zone |
-| `preflight.html` | inline | persistente Checklist-UI mit Fortschrittsbalken |
-| `wiring.html` | inline | Mermaid-Graph, Connection-Type-Filter, Zonen- und Statistikansichten |
+| Security | 3 parallele Fetches | initiale Auswahl aus Hash, sonst `cockpit-last-scan`, sonst erster Threat |
+| Runway | 1 Pflichtkatalog | Filter dimmen statt zu entfernen; Blade via `#model-<id>` |
+| Tower | 3 Pflichtkataloge | zwei Deep-Link-Typen: `#control=` und `#sovereign=` |
+| Wiring | 2 Pflichtkataloge | JSON wird zu Mermaid-Source kompiliert; Knoten verlinken zur Cockpit-Blade |
+| Pre-Flight | 1 Pflichtkatalog | Statuspersistenz in `copilot-preflight` |
 
-## 4. Datenfluesse
+## 6. Navigationsmodell
 
-### 4.1 Cockpit-Flow
+### 6.1 Zwischen Seiten
 
-`index.html` stellt nur Container bereit:
+Das Repo nutzt **echte Dateinavigation**:
 
-- `#cockpit-grid`
-- `#cockpit-legend`
-- `#detail-panel`
+- `index.html`
+- `terminal.html`
+- `jet-bridge.html`
+- `ramp.html`
+- `runway.html`
+- `security.html`
+- `tower.html`
+- `flight-log.html`
+- `preflight.html`
+- `wiring.html`
 
-`app.js` erledigt dann:
+Die Hauptnavigation ist in den Seiten wiederholt eingebettet, nicht zentral komponiert.
 
-1. Daten laden
-2. Zonen in fester Reihenfolge rendern
-3. Instrument-Karten rendern
-4. Detail-Blade on demand aufbauen
-5. Filter, Suche und Deep Links aktivieren
-
-Wichtige Sonderpfade:
-
-- **EICAS-Zone** rendert Modelle statt Instrument-Karten
-- **FMS-Zone** rendert eine feste Chain-Reihenfolge
-- Security- und Governance-Daten werden nur als Zusatzindex geladen
-
-### 4.2 Security-Flow
-
-`security.html` laedt drei Quellen parallel:
-
-```js
-const [inst, threats, frameworks] = await Promise.all([
-    fetch('data/copilot-instruments.json').then(r => r.json()),
-    fetch('data/security-threats.json').then(r => r.json()),
-    fetch('data/security-frameworks.json').then(r => r.json())
-]);
-```
-
-Danach baut die Seite:
-
-- die Luggage Lane (`.luggage-item`)
-- das Scan-Detail
-- Mermaid-Threat-Modelle
-- Before/After-Demos
-- Framework-Chips
-
-Die aktive Auswahl kommt aus:
-
-1. `#scan=<instrumentId>`
-2. sonst `localStorage['cockpit-last-scan']`
-3. sonst erster Threat-Eintrag
-
-### 4.3 Runway-Flow
-
-`runway.html` ist die Modellperspektive. Das Datenmodell aus `copilot-models.json` steuert:
-
-- Provider-Chips
-- Plan-Select
-- Statusfilter
-- Departure Board
-- Model Blade
-- Topology Matrix
-
-Die Blade-Navigation ist hash-basiert:
-
-```text
-runway.html#model-gpt-4-1
-```
-
-### 4.4 Tower-Flow
-
-`tower.html` verknuepft drei fachlich getrennte Sichten:
-
-- Governance Controls (`governance-controls.json`)
-- Modellrouting / Flight Plans (`copilot-models.json`)
-- Sovereignty / Residency (`sovereign-cloud.json`)
-
-Deep Links highlighten Zielknoten im bestehenden Layout, statt eine Blade zu oeffnen:
-
-```text
-tower.html#control=feature-policies
-tower.html#sovereign=byok-enterprise
-```
-
-### 4.5 Wiring-Flow
-
-`wiring.html` kombiniert:
-
-- `wiring-diagram.json` fuer Kanten- und Typdefinitionen
-- `copilot-instruments.json` fuer Knotennamen, Symbole und Zonen
-
-Aus den JSON-Daten wird Mermaid-Source generiert. Click-Aktionen springen direkt ins Cockpit:
-
-```js
-src += `    click ${id} "index.html#instrument-${id}" "..."\n`;
-```
-
-## 5. Komponenten und Beziehungen
-
-### 5.1 Header-Navigation
-
-Alle Seiten verwenden dieselbe Perspektivenleiste. Die Navigation ist also **kopiert, nicht zentral komponiert**. Das reduziert Abhaengigkeiten, fuehrt aber zu Redundanz.
-
-### 5.2 Suche
-
-Es gibt zwei Suchsysteme:
-
-| Suche | Datei | Scope |
-|---|---|---|
-| lokale Cockpit-Suche | `app.js` | Filtert Instrument-Karten in `index.html` |
-| globale Suche | `search.js` | palette-basierte Suche ueber mehrere Datenkataloge |
-
-Wichtig: Auf `index.html` teilen sich beide Systeme Shortcut-Logik um `Ctrl+K`.
-
-### 5.3 Theme
-
-Das Theme wird in `localStorage['cockpit-theme']` gespeichert und auf allen Seiten wiederverwendet. Mermaid-Seiten rendern Diagramme nach Theme-Wechsel neu.
-
-### 5.4 Detail-Komponenten
-
-| Blade / Detailansicht | Seite | Trigger |
-|---|---|---|
-| Cockpit Detail Blade | `index.html` | Klick auf `.instrument`, `#instrument-...` |
-| Ramp Blade | `ramp.html` | Klick auf `.ramp-card`, `#instrument-...` |
-| Runway Model Blade | `runway.html` | Klick auf `.departure-row`, `#model-...` |
-| Security Scanner Detail | `security.html` | Klick auf `.luggage-item`, `#scan=...` |
-
-## 6. Persistenz und URL-State
+### 6.2 Innerhalb einer Seite
 
 | Mechanismus | Verwendet in | Zweck |
 |---|---|---|
-| `localStorage['cockpit-theme']` | fast alle Seiten | Theme |
-| `localStorage['copilot-preflight']` | `preflight.html` | Checklist-Status |
-| `localStorage['cockpit-last-scan']` | `security.html` | zuletzt gescannter Threat |
-| `localStorage['cockpit-security-posture']` | `security.html` | Posture-Checkboxen |
-| URL-Hash | mehrere Seiten | Deep Link auf Instrument, Modell, Control oder Sovereign Option |
+| URL-Hash | Cockpit, Ramp, Runway, Security, Tower | Deep Links in Blade-, Scanner- oder Highlight-Ziele |
+| `history.pushState` / `replaceState` | Cockpit, Runway, Security | URL aktualisieren ohne Seitenwechsel |
+| `hashchange` | Ramp, Runway, Security, Tower | Deep Links auch bei Browser-Navigation anwenden |
+| `localStorage` | nahezu alle Seiten | Theme oder page-lokalen Zustand halten |
 
-## 7. Externe Laufzeitabhaengigkeiten
+## 7. Zustand und Persistenz
 
-| Technologie | Verwendung |
+| Key | Seite | Bedeutung |
+|---|---|---|
+| `cockpit-theme` | fast alle Seiten | Dark/Light Theme |
+| `copilot-preflight` | `preflight.html` | erledigte Checklisteneintraege |
+| `cockpit-last-scan` | `security.html` | zuletzt betrachteter Threat |
+| `cockpit-security-posture` | `security.html` | 9 Checkbox-Zustaende fuer Security Posture |
+
+## 8. Zentrale Komponenten
+
+### 8.1 `app.js`
+
+Die Cockpit-Runtime stellt den dichtesten Logikkern des Repos:
+
+| Bereich | Funktion |
 |---|---|
-| Mermaid | `index.html`, `runway.html`, `security.html`, `tower.html`, `wiring.html` |
-| Prism.js | nur `index.html`, fuer Code-Tabs in der Detail-Blade |
-| Google Fonts (`JetBrains Mono`) | alle Seiten |
-| Vercel Insights / Speed Insights | Footer-Scripts auf mehreren Seiten |
+| Datenbootstrap | laedt Instrumente und weiche Zusatzkataloge |
+| Zonenrendering | verarbeitet Zone Order, EICAS-Cluster und FMS-Chain |
+| Detail-Blade | generiert Tabs nur, wenn Daten vorhanden sind |
+| Ressourcen-Tab | verknuepft externe Links, Security-Relevanz und Data-Quality-Hinweise |
+| Filter/Suche | dimmt Karten, statt sie aus dem DOM zu entfernen |
 
-## 8. Architekturentscheidungen und Konsequenzen
+### 8.2 `search.js`
 
-### Vorteile
+`search.js` ist das globale Suchsystem ueber mehrere Perspektiven. Es baut einen kleinen In-Memory-Index aus Instrumenten, Controls, Modellen und Changelog-Eintraegen und oeffnet eine Command Palette ueber `Ctrl+K` bzw. `Cmd+K`.
 
-- sehr einfacher Deploy
-- gute Lesbarkeit der HTML-Einstiegspunkte
-- Daten und Darstellung klar getrennt
-- JSON-Dateien lassen sich unabhaengig pflegen
+### 8.3 Mermaid als Renderbaustein
 
-### Kosten
+Mermaid ist kein dekoratives Extra, sondern Teil mehrerer Kernseiten:
 
-- Header/Footer/Theme-Code ist ueber viele Seiten dupliziert
-- keine zentrale Router- oder State-Schicht
-- Deep-Link-Logik ist seitenlokal implementiert
-- Integrationsfehler zwischen JSON-Dateien muessen durch Tests abgefangen werden
+| Seite | Rolle |
+|---|---|
+| Cockpit | Diagrams-Tab in der Blade |
+| Runway | Topology |
+| Security | Threat Models |
+| Tower | Sovereign Data Flow |
+| Wiring | kompletter Verbindungsgraph |
 
-## 9. Wichtigste technische Beobachtungen
+## 9. Architekturfolgen fuer Wartung und Refactoring
 
-1. **`copilot-instruments.json` ist der Hub** fuer mehrere andere Datenmodelle.
-2. **`app.js` behandelt Zusatzdaten tolerant**; fehlende Threat-, Governance- oder Modelldaten blockieren das Cockpit nicht.
-3. **Die Seite ist absichtlich page-local aufgebaut**: fast jede Perspektive besitzt ihre eigene Renderpipeline.
-4. **Die Dokumentation sollte das Repo als MPA beschreiben, nicht als SPA.**
+| Beobachtung | Praktische Folge |
+|---|---|
+| Page-lokale Renderpipelines | Aenderungen muessen seitenweise gedacht und getestet werden |
+| `copilot-instruments.json` als Hub | ID-Aenderungen haben hohe Seiteneffekte |
+| Tolerantes Enrichment im Cockpit | fehlende Zusatzdaten sollen Cockpit nicht komplett lahmlegen |
+| Kopierte Navigation und Theme-Logik | Inkonsistenzen koennen leicht auf einzelnen Seiten entstehen |
+| Statisches Deployment | Laufzeitprobleme sind haeufig Daten-, Cache- oder CDN-Themen statt Build-Fehler |
+
+## 10. Grenzen und gesicherte Unsicherheiten
+
+| Thema | Was belegt ist | Was nur abgeleitet ist |
+|---|---|---|
+| Seitliche Organisation | HTML-Dateien, DOM-Struktur und Fetch-Logik | die inhaltliche Metapher als Produktstrategie |
+| Datenkatalog | JSON-Schemas und Konsumenten im Code | semantische Vollstaendigkeit der Inhalte |
+| Modellkatalog | Struktur und Rendering im Code | fachliche Aktualitaet einzelner Modellangaben |
+| Framework-Mappings | Links und IDs im Katalog | externe Richtigkeit ohne manuelle Verifikation |
+
+Weiterfuehrend: [`API-REFERENCE.md`](API-REFERENCE.md), [`DATA-CATALOG.md`](DATA-CATALOG.md), [`OPERATIONS.md`](OPERATIONS.md)

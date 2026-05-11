@@ -1,415 +1,192 @@
 # Data Catalog
 
-## 1. Uebersicht
+## 1. Warum dieser Katalog wichtig ist
 
-Alle fachlichen Inhalte des Projekts liegen unter `C:\temp\copilot-cockpit\data\`. Die JSON-Dateien fungieren als **Content-Kataloge**, nicht nur als Konfiguration.
+Die JSON-Dateien unter `C:\temp\copilot-cockpit\data` sind nicht bloss Konfiguration. Sie sind **die fachliche Quelle der Anwendung**. Wer Inhalte aendert, aendert damit direkt Rendering, Deep Links, Suche und oft auch Testverhalten.
 
-| Datei | Kernzweck | Hauptkonsumenten |
+## 2. Gesamtuebersicht
+
+| Datei | Rolle | Wichtige Konsumenten | Kritische Pflegehinweise |
+|---|---|---|---|
+| `copilot-instruments.json` | Hauptkatalog fuer Zonen, Plaene, Instrumente | `app.js`, `ramp.html`, `security.html`, `wiring.html`, `search.js` | IDs sind Hub-Referenzen fuer mehrere andere Dateien |
+| `copilot-models.json` | Modellkatalog fuer Runway und Teile von Tower/Cockpit | `runway.html`, `tower.html`, `app.js`, `search.js` | Datei markiert sich selbst als verifikationspflichtig |
+| `governance-controls.json` | Governance-Registry | `tower.html`, `app.js`, `search.js` | Control-IDs muessen mit Deep Links stabil bleiben |
+| `security-threats.json` | Threat-Katalog pro Instrument | `security.html`, `app.js` | `instrumentId` muss auf existierende Instrumente zeigen |
+| `security-frameworks.json` | Registry fuer OWASP/ATLAS/CWE | `security.html` | Framework-Links und Summaries sind teils noch manuell zu verifizieren |
+| `terminal-guide.json` | Content-Modell fuer Einstieg | `terminal.html` | rein redaktionell, aber DOM-Rendering erwartet definierte Sektionen |
+| `jet-bridge-guide.json` | Content-Modell fuer Prompt- und Agent-Guide | `jet-bridge.html` | strukturierte Sections statt freies Rich-Content-Modell |
+| `preflight-checklist.json` | Interaktive Checklist | `preflight.html` | `items[].id` ist Persistenzschluessel |
+| `known-changelog-entries.json` | Release- und Event-Historie | `flight-log.html`, `search.js` | Entry-Typen und Instrument-Referenzen muessen konsistent sein |
+| `sovereign-cloud.json` | Data-Residency- und Sovereignty-Modell | `tower.html` | mehrere Teilbereiche speisen unterschiedliche UI-Sektionen |
+| `wiring-diagram.json` | Verbindungsgraph | `wiring.html` | `from`/`to` muessen existierende Instrumente referenzieren |
+
+## 3. Datei-fuer-Datei-Referenz
+
+### 3.1 `copilot-instruments.json`
+
+| Aspekt | Details |
+|---|---|
+| Top-Level-Keys | `version`, `lastUpdated`, `zones`, `plans`, `instruments` |
+| Aktuelle Groesse | 8 Zonen, 5 Plaene, 46 Instrumente |
+| Hauptfunktion | Canonical Catalog fuer Cockpit, Ramp, Wiring und Teile von Security/Search |
+| Typische Referenzen | `relatedInstruments`, `planAvailability`, `securityRelevance`, `links`, `mermaidDiagrams`, `codeExamples` |
+
+**Konsumenten**
+
+- `app.js` rendert Cockpit, Blade, Filter und Ressourcen-Tab.
+- `ramp.html` filtert auf Instrumente mit `perspectives.includes('ramp')`.
+- `security.html` loest Symbol und Name fuer Threats auf.
+- `wiring.html` nutzt Zone, Symbol und Name fuer Knoten.
+- `search.js` indexiert Instrumente global.
+
+**Pflegehinweise**
+
+1. Instrument-IDs sind externe Referenzen fuer `security-threats.json`, `known-changelog-entries.json` und `wiring-diagram.json`.
+2. Eine ID-Umbenennung ist nie lokal.
+3. Kommentare oder Begleittexte mit alten Gesamtzahlen sind nicht massgeblich; der Katalog selbst ist die Quelle.
+
+### 3.2 `copilot-models.json`
+
+| Aspekt | Details |
+|---|---|
+| Top-Level-Keys | `$schema`, `version`, `lastUpdated`, `verificationRequired`, `verificationNotes`, `description`, `sources`, `capabilities`, `surfaces`, `plans`, `models` |
+| Aktuelle Groesse | 3 Quellen, 6 Capabilities, 6 Surfaces, 5 Plaene, 21 Modelle |
+| Hauptfunktion | fuellt Runway-Board, Model Blade, Tower-Flight-Plans und Cockpit-EICAS-Enrichment |
+| Wichtige Felder | `planAvailability`, `surfaceAvailability`, `ideAvailability`, `status`, `taskFit`, `sourceLinks` |
+
+**Besonderheit**
+
+Die Datei markiert sich selbst mit `verificationRequired: true`. Dokumentation und Betrieb sollten das nicht weichzeichnen.
+
+**Pflegehinweise**
+
+1. Plan-/Surface-Aenderungen beeinflussen Runway-Filter und Blade-Matrizen.
+2. Deprecation-Infos steuern Grounded-Darstellung und Alternativlinks.
+3. Flight Plans in `tower.html` erwarten stabile Modell-IDs.
+
+### 3.3 `governance-controls.json`
+
+| Aspekt | Details |
+|---|---|
+| Top-Level-Keys | `version`, `lastUpdated`, `verificationRequired`, `description`, `sources`, `controls` |
+| Aktuelle Groesse | 6 Framework-Quellen, 20 Controls |
+| Hauptfunktion | Governance-Liste und Framework-Legende im Tower |
+| Wichtige Felder | `id`, `category`, `scope`, `defaultState`, `rolloutEffort`, `governanceNote`, `complianceRelevance` |
+
+**Pflegehinweise**
+
+1. `id` speist `#control=<id>`-Deep-Links.
+2. `sources` sind direkt verlinkt; kaputte URLs sind sofort sichtbar.
+3. `complianceRelevance` taucht als Badge in der UI auf.
+
+### 3.4 `security-threats.json`
+
+| Aspekt | Details |
+|---|---|
+| Top-Level-Keys | `version`, `lastUpdated`, `description`, `schema`, `threats` |
+| Aktuelle Groesse | 22 Threat-Eintraege |
+| Hauptfunktion | Scanner-Inhalte, Threat Models, Demos, Countermeasures |
+| Wichtige Felder | `instrumentId`, `classification`, `cia`, `threatModel`, `scenario`, `demo`, `countermeasures`, `blastRadius`, `mitigatesCWE`, `frameworks` |
+
+**Pflegehinweise**
+
+1. Jeder Eintrag braucht ein passendes Instrument in `copilot-instruments.json`.
+2. Mermaid-Diagramme muessen lauffaehig bleiben oder landen als Text-Fallback.
+3. `frameworks` und `mitigatesCWE` sind nur so gut wie `security-frameworks.json`.
+
+### 3.5 `security-frameworks.json`
+
+| Aspekt | Details |
+|---|---|
+| Top-Level-Keys | `version`, `lastUpdated`, `verificationRequired`, `description`, `sources`, `frameworks`, `cwePattern` |
+| Aktuelle Groesse | 6 OWASP-LLM-Eintraege, 6 ATLAS-Eintraege |
+| Hauptfunktion | Link-Aufloesung fuer Framework-Chips in Security |
+| Besonderheit | enthaelt explizite Hinweise, dass URLs/Titel/Summaries manuell verifiziert werden sollen |
+
+**Pflegehinweise**
+
+1. Diese Datei ist eine Registry, kein abgeschlossener Wahrheitsbeweis.
+2. Fehlende IDs werden in der UI als kaputte Chips sichtbar.
+3. `cwePattern.urlTemplate` steuert alle CWE-Links.
+
+### 3.6 `terminal-guide.json`
+
+| Aspekt | Details |
+|---|---|
+| Top-Level-Keys | `version`, `lastUpdated`, `description`, `checkIn`, `boardingPass`, `firstFlight`, `departures` |
+| Aktuelle Groesse | 5 Plaene, 6 IDEs, 3 Uebungen, 5 Ziele |
+| Hauptfunktion | reine Content-Quelle fuer `terminal.html` |
+| Risiko | wenig Cross-Referenzen, aber DOM-Abschnitte erwarten volle Sektionen |
+
+### 3.7 `jet-bridge-guide.json`
+
+| Aspekt | Details |
+|---|---|
+| Top-Level-Keys | `version`, `lastUpdated`, `description`, `promptCraft`, `contextManagement`, `editMode`, `agentPatterns`, `nextSteps` |
+| Aktuelle Groesse | 6 Techniken, 3 Participants, 3 Variables, 3 Workflows, 5 Patterns, 5 Ziele |
+| Hauptfunktion | page-lokaler Lernkatalog fuer `jet-bridge.html` |
+| Risiko | stark section-orientiertes Rendering, daher eher struktur- als typo-empfindlich |
+
+### 3.8 `preflight-checklist.json`
+
+| Aspekt | Details |
+|---|---|
+| Top-Level-Keys | `version`, `lastUpdated`, `description`, `intro`, `categories` |
+| Aktuelle Groesse | 6 Kategorien, 22 Items |
+| Hauptfunktion | Checkliste mit lokaler Persistenz |
+| Kritisch | `items[].id` wird direkt als Persistenz-ID verwendet |
+
+### 3.9 `known-changelog-entries.json`
+
+| Aspekt | Details |
+|---|---|
+| Top-Level-Keys | `version`, `lastUpdated`, `entryTypes`, `entries` |
+| Aktuelle Groesse | 6 Entry-Typen, 35 Eintraege |
+| Hauptfunktion | Flight Log und globaler Suchindex |
+| Kritisch | `entries[].instruments[]` muss auf existierende Instrumente zeigen |
+
+### 3.10 `sovereign-cloud.json`
+
+| Aspekt | Details |
+|---|---|
+| Top-Level-Keys | `version`, `lastUpdated`, `description`, `sovereignPillars`, `deploymentOptions`, `residualRisks`, `providerStrategies` |
+| Aktuelle Groesse | 3 Pillars, 6 Deployment Options, 3 Residual Risks, 4 Provider Strategies |
+| Hauptfunktion | mehrere Tower-Sektionen auf einmal |
+| Kritisch | Option-IDs treiben `#sovereign=<id>`-Deep-Links |
+
+### 3.11 `wiring-diagram.json`
+
+| Aspekt | Details |
+|---|---|
+| Top-Level-Keys | `version`, `lastUpdated`, `description`, `intro`, `connectionTypes`, `connections` |
+| Aktuelle Groesse | 4 Verbindungstypen, 55 Verbindungen |
+| Hauptfunktion | Mermaid-Graph und Statistik in `wiring.html` |
+| Kritisch | `connectionTypes` steuern Filter und Kantenstil; `from`/`to` muessen auf Instrumente zeigen |
+
+## 4. Datenbeziehungen, die man nicht uebersehen sollte
+
+| Von | Nach | Art der Beziehung |
 |---|---|---|
-| `copilot-instruments.json` | Canonical Catalog fuer Instrumente und Zonen | `app.js`, `ramp.html`, `wiring.html`, `search.js` |
-| `copilot-models.json` | Modellkatalog fuer Runway/Tower | `runway.html`, `tower.html`, `app.js`, `search.js` |
-| `governance-controls.json` | Governance- und Compliance-Registry | `tower.html`, `app.js`, `search.js` |
-| `security-threats.json` | Threat Models pro Instrument | `security.html`, `app.js` |
-| `security-frameworks.json` | OWASP-/ATLAS-/CWE-Referenzdaten | `security.html` |
-| `terminal-guide.json` | Onboarding-Inhalte | `terminal.html` |
-| `jet-bridge-guide.json` | Prompt-/Context-/Agent-Guides | `jet-bridge.html` |
-| `preflight-checklist.json` | Rollout-Checkliste | `preflight.html` |
-| `known-changelog-entries.json` | Release-Historie | `flight-log.html`, `search.js` |
-| `sovereign-cloud.json` | Data Residency und Sovereignty | `tower.html` |
-| `wiring-diagram.json` | Feature-Beziehungsgraph | `wiring.html` |
-
-## 2. Dateidetails
-
-### 2.1 `data/copilot-instruments.json`
-
-**Rolle:** Zentraler Katalog fuer Cockpit-Instrumente.
-
-**Top-Level-Keys**
-
-- `version`
-- `lastUpdated`
-- `zones`
-- `plans`
-- `instruments`
-
-**Struktur**
-
-- `zones[]`: 8 Cockpit-Zonen (`pfd`, `nd`, `glareshield`, `eicas`, `pedestal`, `overhead`, `side`, `fms`)
-- `plans[]`: Plan-Tiers (`free`, `pro`, `pro-plus`, `business`, `enterprise`)
-- `instruments[]`: Hauptobjekte mit `id`, `symbol`, `name`, `zone`, `status`, `planAvailability`, `capabilities`, `relatedInstruments`, `mermaidDiagrams`, `codeExamples`
-
-**Technische Bedeutung**
-
-- Hub fuer Cross-References in Changelog, Wiring und Security
-- bestimmt Karten im Cockpit und Ramp
-- liefert Zonen- und Symbolmetadaten fuer Wiring
-
-**Beispiel**
-
-```json
-{
-  "id": "agent-mode",
-  "symbol": "AGT",
-  "name": "Agent Mode",
-  "zone": "pfd",
-  "status": "ga"
-}
-```
-
-### 2.2 `data/copilot-models.json`
-
-**Rolle:** Modellkatalog fuer `runway.html` und Teile von `tower.html`.
-
-**Top-Level-Keys**
-
-- `$schema`
-- `version`
-- `lastUpdated`
-- `verificationRequired`
-- `verificationNotes`
-- `description`
-- `sources`
-- `capabilities`
-- `surfaces`
-- `plans`
-- `models`
-
-**Struktur**
-
-- `capabilities[]`: u. a. `reasoning`, `code`, `long-context`, `vision`, `tool-use`, `speed`
-- `surfaces[]`: `chat`, `inline`, `edits`, `agent`, `coding-agent`, `code-review`
-- `plans[]`: Plan-Matrix
-- `models[]`: eigentliche Modelldefinitionen mit Provider, Availability und Metadaten
-
-**Technische Bedeutung**
-
-- fuellt Runway-Departure-Board und Model-Blade
-- liefert Tower-Flight-Plans
-- speist Cockpit-EICAS, falls Modell-Enrichment verfuegbar ist
-
-**Wichtig**
-
-- `verificationRequired: true`
-- Runway-Tests erwarten aktuell **21 gerenderte Departure Rows**
-
-**Beispiel**
-
-```json
-{
-  "id": "gpt-4-1",
-  "displayName": "GPT-4.1",
-  "provider": "OpenAI",
-  "surfaceAvailability": {
-    "chat": true,
-    "inline": true,
-    "agent": true
-  }
-}
-```
-
-### 2.3 `data/governance-controls.json`
-
-**Rolle:** Governance-Registry fuer Tower.
-
-**Top-Level-Keys**
-
-- `version`
-- `lastUpdated`
-- `verificationRequired`
-- `description`
-- `sources`
-- `controls`
-
-**Struktur**
-
-- `sources`: Framework-Lexikon fuer `soc2`, `iso27001`, `gdpr`, `hipaa`, `fedramp`, `euAiAct`
-- `controls[]`: Controls mit `id`, `category`, `scope`, `defaultState`, `rolloutEffort`, `governanceNote`, `complianceRelevance`
-
-**Technische Bedeutung**
-
-- Tower rendert daraus Framework-Chips und Control-Liste
-- `app.js` baut daraus `governanceIndex`
-- `search.js` indexiert Controls fuer die globale Suche
-
-**Wichtig**
-
-- `verificationRequired: false`
-- Tower-Tests erwarten aktuell **20 gerenderte Controls**
-
-### 2.4 `data/security-threats.json`
-
-**Rolle:** Adversarial View auf sicherheitsrelevante Instrumente.
-
-**Top-Level-Keys**
-
-- `version`
-- `lastUpdated`
-- `description`
-- `schema`
-- `threats`
-
-**Struktur pro Threat**
-
-- `instrumentId`
-- `classification`
-- `cia`
-- `threatModel`
-- `scenario`
-- `demo`
-- `countermeasures`
-- `blastRadius`
-- `mitigatesCWE`
-- `frameworks`
-
-**Technische Bedeutung**
-
-- treibt den X-Ray-Scanner
-- liefert Mermaid-Diagramme, Before/After-Demos und CWE-/Framework-Links
-- `app.js` extrahiert daraus `scannerIndex`
-
-**Beispiel**
-
-```json
-{
-  "instrumentId": "content-exclusion",
-  "classification": "preventive",
-  "cia": ["confidentiality"],
-  "blastRadius": "high"
-}
-```
-
-### 2.5 `data/security-frameworks.json`
-
-**Rolle:** Registry fuer externe Sicherheitsklassifikationen.
-
-**Top-Level-Keys**
-
-- `version`
-- `lastUpdated`
-- `verificationRequired`
-- `description`
-- `sources`
-- `frameworks`
-- `cwePattern`
-
-**Struktur**
-
-- `frameworks.owaspLLM`
-- `frameworks.atlas`
-- `cwePattern.urlTemplate`
-
-**Technische Bedeutung**
-
-- `security.html` baut daraus Framework-Chips mit externen Links
-- IDs aus `security-threats.json` werden hier aufgeloest
-
-**Wichtig**
-
-- `verificationRequired: true`
-- Datei kennzeichnet sich selbst explizit als **manuell zu verifizieren**
-
-### 2.6 `data/terminal-guide.json`
-
-**Rolle:** Fachinhalte fuer `terminal.html`.
-
-**Top-Level-Keys**
-
-- `version`
-- `lastUpdated`
-- `description`
-- `checkIn`
-- `boardingPass`
-- `firstFlight`
-- `departures`
-
-**Inhalt**
-
-- 5 Plan-Karten
-- 6 IDE-Karten
-- 3 erste Uebungen
-- 5 Weiterleitungsziele
-
-**Technische Bedeutung**
-
-- reines Content-Modell fuer page-lokales Rendering
-- keine Cross-References auf andere JSON-Dateien notwendig
-
-### 2.7 `data/jet-bridge-guide.json`
-
-**Rolle:** Lern- und Pattern-Katalog fuer `jet-bridge.html`.
-
-**Top-Level-Keys**
-
-- `version`
-- `lastUpdated`
-- `description`
-- `promptCraft`
-- `contextManagement`
-- `editMode`
-- `agentPatterns`
-- `nextSteps`
-
-**Inhalt**
-
-- 6 Prompt-Techniken
-- 3 Participants (`@workspace`, `@vscode`, `@terminal`)
-- 3 Variablen (`#file`, `#selection`, `#codebase`)
-- 3 Edit-Workflows
-- 5 Agent-Patterns
-
-**Technische Bedeutung**
-
-- strikt in Sections gruppiertes Content-Schema
-- Inhalte werden 1:1 in Karten und Beispielblöcke ueberfuehrt
-
-### 2.8 `data/preflight-checklist.json`
-
-**Rolle:** Persistente Rollout-/Onboarding-Checkliste.
-
-**Top-Level-Keys**
-
-- `version`
-- `lastUpdated`
-- `description`
-- `intro`
-- `categories`
-
-**Struktur**
-
-- 6 Kategorien
-- jede Kategorie besitzt `id`, `title`, `icon`, `perspective`, `items[]`
-
-**Technische Bedeutung**
-
-- `perspective` verlinkt in andere HTML-Seiten
-- `items[].id` wird als LocalStorage-Key fuer Checklistenstatus verwendet
-
-**Beispiel**
-
-```json
-{
-  "id": "tower",
-  "perspective": "tower.html",
-  "items": [
-    { "id": "org-policy-reviewed", "label": "Organization Copilot policy reviewed" }
-  ]
-}
-```
-
-### 2.9 `data/known-changelog-entries.json`
-
-**Rolle:** Changelog und Historie der Copilot-Features.
-
-**Top-Level-Keys**
-
-- `version`
-- `lastUpdated`
-- `entryTypes`
-- `entries`
-
-**Struktur**
-
-- `entryTypes`: `departure`, `cleared`, `upgrade`, `notam`, `grounded`, `turbulence`
-- `entries[]`: `id`, `date`, `type`, `title`, `description`, `instruments[]`, `zone`, `source`
-
-**Technische Bedeutung**
-
-- fuellt `flight-log.html`
-- wird von `search.js` als eigener Suchtyp indexiert
-- verlinkt ueber `instruments[]` zurueck in das Cockpit
-
-**Wichtig**
-
-- README nennt **35 Eintraege**
-- `integrity.spec.js` validiert Instrument-Referenzen und Entry-Typen
-
-### 2.10 `data/sovereign-cloud.json`
-
-**Rolle:** Datenmodell fuer Tower-Unterbereich "Sovereign Cloud & Data Residency".
-
-**Top-Level-Keys**  
-im sichtbaren Dateibereich:
-
-- `version`
-- `lastUpdated`
-- `description`
-- `sovereignPillars`
-- `deploymentOptions`
-
-Weitere Bereiche werden durch Tower-Tests und Rendering benoetigt:
-
-- Provider-Strategien
-- Residual Risks
-- Data-Flow-Matrix
-
-**Inhalt**
-
-- 3 Sovereignty Pillars
-- 6 Deployment Options
-- 4 Provider Strategy Cards
-- 3 Residual Risk Cards
-
-**Technische Bedeutung**
-
-- liefert Tower-Diagramm, Optionskarten, Matrix und Highlight-Ziele fuer `#sovereign=...`
-
-### 2.11 `data/wiring-diagram.json`
-
-**Rolle:** Graphmodell fuer `wiring.html`.
-
-**Top-Level-Keys**
-
-- `version`
-- `lastUpdated`
-- `description`
-- `intro`
-- `connectionTypes`
-- `connections`
-
-**Struktur**
-
-- `connectionTypes[]`: `context`, `powers`, `governs`, `extends`
-- `connections[]`: `from`, `to`, `type`, `label`
-
-**Technische Bedeutung**
-
-- wird mit `copilot-instruments.json` gemerged
-- erzeugt Mermaid-Source fuer Knotengruppen nach Zone
-- Click-Ziele springen ins Cockpit
-
-**Wichtig**
-
-- README beschreibt **55 Verbindungen**
-- `integrity.spec.js` validiert Connection-Typen und Endpunkte
-
-## 3. Datenbeziehungen
-
-### Hub-Datei
-
-`copilot-instruments.json` ist die wichtigste Referenzdatei. Sie wird benutzt von:
-
-- `security-threats.json` via `instrumentId`
-- `known-changelog-entries.json` via `instruments[]`
-- `wiring-diagram.json` via `from`/`to`
-- `search.js` fuer globale Suche
-
-### Modell- und Governance-Bezug
-
-- `copilot-models.json` wird sowohl fachlich in `runway.html` als auch administrativ in `tower.html` verwendet.
-- `governance-controls.json` definiert IDs, die zugleich in Deep Links und in Wiring-Kanten auftauchen.
-
-## 4. Datenqualitaet und Testabdeckung
-
-`tests/integrity.spec.js` validiert derzeit:
-
-- Changelog -> Instrument-Referenzen
-- Wiring-Endpunkte
-- `relatedInstruments`
-- Instrument-ID-Duplikate
-- Pflichtfelder
-- gueltige Zonen
-- Changelog-Typen
-- Wiring-Typen
-- Modell-ID-Duplikate
-
-Nicht alle JSON-Dateien werden dadurch gleich stark abgesichert. Besonders inhaltliche Guide-Dateien (`terminal-guide.json`, `jet-bridge-guide.json`) sind vor allem durch Seiten-Renderingstests abgedeckt.
+| `security-threats.json` | `copilot-instruments.json` | `instrumentId` |
+| `known-changelog-entries.json` | `copilot-instruments.json` | `instruments[]` |
+| `wiring-diagram.json` | `copilot-instruments.json` | `from`, `to` |
+| `tower.html` | `copilot-models.json` | Flight Plans und Modellanzeigen |
+| `security-threats.json` | `security-frameworks.json` | OWASP-/ATLAS-/CWE-Aufloesung |
+
+## 5. Pflegerisiken nach Dateityp
+
+| Dateityp | Typisches Risiko | Minimale Gegenmassnahme |
+|---|---|---|
+| Hub-Kataloge | ID-Bruch mit Seiteneffekten | betroffene Seitenspec plus `integrity.spec.js` |
+| Registry-Dateien | kaputte externe Links oder fehlende Keys | Zielseite oeffnen und Badge-/Link-Rendering pruefen |
+| Guide-Dateien | Layout bleibt technisch heil, wird aber inhaltlich inkonsistent | DOM-Render der Zielseite plus inhaltlicher Review |
+| Diagrammdateien | Mermaid oder Querverweise brechen | Zielseite plus Deep-Link-/Graph-Check |
+
+## 6. Pflege-Checkliste
+
+1. Erst klaeren, ob die Aenderung eine **ID**, nur **Copy** oder **Struktur** betrifft.
+2. Bei ID-Aenderungen immer nach Konsumenten in mehreren Seiten suchen.
+3. Bei `verificationRequired`-Katalogen keine zu starken Gewissheiten in README oder Doku formulieren.
+4. Nach JSON-Aenderungen mindestens die Zielseite und `tests\integrity.spec.js` einplanen.
+
+Weiterfuehrend: [`API-REFERENCE.md`](API-REFERENCE.md), [`TESTING-GUIDE.md`](TESTING-GUIDE.md), [`OPERATIONS.md`](OPERATIONS.md)

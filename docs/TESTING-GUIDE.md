@@ -1,76 +1,47 @@
 # Testing Guide
 
-## 1. Stack
+## 1. Teststrategie in einem Satz
 
-Das Projekt verwendet **ausschliesslich Playwright** fuer automatisierte Tests.
+Das Quell-Repo setzt praktisch komplett auf **Playwright als Integrations- und Seitenvertragstest**, inklusive Browser-Interaktion und datengetriebener Integritaetspruefung.
 
-| Bestandteil | Wert |
+## 2. Test-Setup
+
+| Bereich | Stand |
 |---|---|
 | Framework | `@playwright/test` |
-| Konfigurationsdatei | `playwright.config.js` |
+| Konfiguration | `playwright.config.js` |
 | Testverzeichnis | `tests\` |
-| NPM-Script | `npm test` |
-| Reporter | `list` |
+| Standardkommando | `npm test` |
 | Browser-Projekt | `chromium` |
+| Reporter | `list` |
+| Base URL | `http://localhost:3000` |
+| Webserver | `python3 -m http.server 3000 --bind 127.0.0.1` |
 
-`package.json` definiert kein Build-, Lint- oder Dev-Script; die Tests sind der einzige automatisierte Standard-Entry-Point.
+### Was das praktisch bedeutet
 
-## 2. Startverhalten
+1. Getestet wird die Site so, wie sie deployt wird: **als statische Ausgabe**.
+2. Ein Node-App-Server existiert nicht.
+3. Datenfehler sind genauso wichtig wie UI-Fehler, weil JSON direkt gerendert wird.
 
-`npm test` expandiert zu:
+## 3. Suite-Struktur
 
-```bash
-npx playwright test
-```
-
-Playwright startet dafuer automatisch einen statischen Webserver:
-
-```js
-webServer: {
-    command: 'python3 -m http.server 3000 --bind 127.0.0.1',
-    port: 3000,
-    reuseExistingServer: !process.env.CI,
-}
-```
-
-### Implikationen
-
-1. Das Projekt wird wie eine **statische Website** getestet.
-2. Ein Node- oder App-Server ist nicht erforderlich.
-3. `python3` muss verfuegbar sein.
-
-## 3. Playwright-Konfiguration
-
-| Setting | Wert |
-|---|---|
-| `testDir` | `./tests` |
-| `fullyParallel` | `true` |
-| `forbidOnly` | in CI aktiv |
-| `retries` | `2` in CI, sonst `0` |
-| `workers` | `1` in CI, lokal Standard |
-| `baseURL` | `http://localhost:3000` |
-| `trace` | `on-first-retry` |
-| `screenshot` | `only-on-failure` |
-
-## 4. Coverage nach Spec-Datei
-
-> Hinweis: Die Root-`README.md` nennt 222 Tests. Die aktuellen Spec-Dateien summieren sich jedoch auf **219 Tests**. Fuer die aktuelle Suite sollte daher die Testbasis in `tests\*.spec.js` als maßgeblich gelten.
-
-| Spec | Fokus | Kernaussagen |
+| Spec | Schwerpunkt | Testtyp |
 |---|---|---|
-| `tests/cockpit.spec.js` | Cockpit-Grid, Blade, Filter, Suche, Theme | prueft Rendering, Zonen, Tabs, Deep Links, Media, Prism |
-| `tests/flight-log.spec.js` | Flight Log | Timeline, Jahrgruppierung, Filter, Navigation, Theme |
-| `tests/integrity.spec.js` | JSON-Integritaet | Node-only-Checks auf Referenzen und Duplikate |
-| `tests/jet-bridge.spec.js` | Jet Bridge | Prompt-Cards, Kontextkarten, Edit-Workflows, Agent-Patterns |
-| `tests/preflight.spec.js` | Pre-Flight | Kategorien, Checkboxen, LocalStorage, Fortschritt, Reset |
-| `tests/ramp.spec.js` | Ramp | Karten, Blade, Hash-Navigation, Metaphern-Key |
-| `tests/runway.spec.js` | Runway | Filterbar, Departure Board, Model Blade, Mermaid, NOTAMs |
-| `tests/security.spec.js` | Security | X-Ray-Scanner, Threat-Diagramme, Framework-Chips, Posture |
-| `tests/terminal.spec.js` | Terminal | Plaene, IDEs, Uebungen, Weiterleitungslinks |
-| `tests/tower.spec.js` | Tower | Frameworks, Controls, Sovereignty, Flight Plans |
-| `tests/wiring.spec.js` | Wiring | Mermaid-Graph, Filter, Legende, Zonen, Statistiken |
+| `cockpit.spec.js` | Cockpit-Grid, Blade, Filter, Suche, Theme, Media | Regression |
+| `terminal.spec.js` | Onboarding-Content | Smoke/Regression |
+| `jet-bridge.spec.js` | Prompt- und Agent-Guide | Smoke/Regression |
+| `ramp.spec.js` | Ramp-Perspektive und Blade | Regression |
+| `runway.spec.js` | Modellkatalog, Filter, Blade, Topology, NOTAMs | Regression |
+| `security.spec.js` | X-Ray Scanner, Framework-Chips, Posture, Cockpit-Bruecke | Regression |
+| `tower.spec.js` | Frameworks, Controls, Sovereign Cloud, Flight Plans | Regression |
+| `flight-log.spec.js` | Timeline und Filter | Smoke/Regression |
+| `preflight.spec.js` | Checklist, Fortschritt, Persistenz | Regression |
+| `wiring.spec.js` | Mermaid-Graph, Filter, Legende, Stats | Regression |
+| `integrity.spec.js` | Referenzen, Duplikate, Gueltigkeit von Datenbeziehungen | Struktur-/Datenvertrag |
 
-## 5. Testzahlen
+## 4. Aktueller Umfang
+
+Die aktuelle Suite summiert sich auf **222 Tests** und stimmt damit mit der Root-README des Quell-Repos ueberein.
 
 | Spec | Anzahl |
 |---|---:|
@@ -80,86 +51,99 @@ webServer: {
 | `jet-bridge.spec.js` | 17 |
 | `preflight.spec.js` | 13 |
 | `ramp.spec.js` | 15 |
-| `runway.spec.js` | 30 |
-| `security.spec.js` | 35 |
+| `runway.spec.js` | 31 |
+| `security.spec.js` | 37 |
 | `terminal.spec.js` | 17 |
 | `tower.spec.js` | 25 |
 | `wiring.spec.js` | 14 |
-| **Gesamt** | **219** |
+| **Gesamt** | **222** |
 
-## 6. Was die Suite besonders gut absichert
+## 5. Smoke vs. Regression
 
-### 6.1 Seitenverhalten
+Das Repo trennt die Suite nicht technisch in zwei Playwright-Projekte. Fuer den Alltag ist die folgende **arbeitspraktische** Trennung sinnvoll:
 
-- Initial Rendering fast aller HTML-Seiten
-- aktive Nav-Links
-- Sichtbarkeit zentraler DOM-Strukturen
-- Fehlerfreiheit im Browser-Console-Output
+### Smoke
 
-### 6.2 Interaktive UI-Muster
+Ziel: schnell erkennen, ob eine Seite noch bootet und ihre Kernlandmarks rendert.
 
-- Blade/Open-Close-Mechanik
-- Filter-Logik
-- Hash-basierte Deep Links
-- Theme-Toggle und Persistenz
-- LocalStorage-basierte Progress-/State-Logik
+Typische Smoke-Kandidaten:
 
-### 6.3 Datenintegritaet
+- jeweils der erste "page load" / "page structure"-Block pro Spec
+- `integrity.spec.js`, wenn nur JSON-Referenzen betroffen sind
+- die betroffene Seitenspec nach einer kleinen lokalen Aenderung
 
-`integrity.spec.js` prueft fachliche Referenzen direkt gegen Dateien im Dateisystem:
+### Regression
 
-```js
-for (const conn of wiring.connections) {
-    if (!allIds.has(conn.from)) invalid.push(...);
-    if (!allIds.has(conn.to)) invalid.push(...);
-}
-```
+Ziel: Interaktionen, Deep Links, Persistenz, Diagramme und Cross-Page-Bruecken mitpruefen.
 
-Das ist wichtig, weil das Repo stark von Cross-References zwischen JSON-Dateien lebt.
+Typische Regression:
 
-## 7. Beobachtbare Luecken
+- komplette betroffene Seitenspec
+- `cockpit.spec.js`, wenn `app.js`, `search.js`, Navigation oder Theme betroffen ist
+- mehrere Seitenspecs, wenn ein Hub-Katalog geaendert wurde
 
-Die Tests sind stark, aber nicht vollkommen symmetrisch:
+## 6. Was die Suite gut absichert
 
-1. `integrity.spec.js` prueft nicht jede einzelne JSON-Datei mit demselben Tiefengrad.
-2. Guide-Dateien wie `terminal-guide.json` und `jet-bridge-guide.json` werden primär ueber DOM-Rendering abgesichert.
-3. Externe CDN-Abhaengigkeiten werden indirekt mitgetestet, aber nicht isoliert contract-basiert.
-4. Wegen statischer Architektur gibt es keine separaten Unit-Tests fuer Renderfunktionen in Inline-Scripts.
+| Bereich | Beispiele |
+|---|---|
+| Seiten-Boot | Hauptcontainer, aktive Navigation, fehlende JS-Fehler |
+| Deep Links | `#instrument-`, `#model-`, `#scan=`, `#control=`, `#sovereign=` |
+| Persistenz | Theme, Preflight-Status, Security-Posture, letzter Scan |
+| Datengetriebene UI | Zahlen von Rows, Chips, Kategorien, Optionen |
+| Diagramme | Mermaid-Rendering in Security, Runway, Tower, Wiring |
+| Cross-Repo-Logik | Integritaet von IDs und Referenzen ueber mehrere JSON-Dateien |
 
-## 8. Nützliche Einzelkommandos
+## 7. Was weniger stark abgesichert ist
+
+| Bereich | Einschraenkung |
+|---|---|
+| Redaktionelle Qualitaet | Texte koennen inhaltlich schwach sein, obwohl DOM-Rendering gruen bleibt |
+| Externe Quellen | CDN-Verfuegbarkeit und externe Standard-Links werden nicht als eigener Vertrag isoliert getestet |
+| Wiederholte Seitenteile | Da Navigation und Theme mehrfach implementiert sind, bleiben semantische Abweichungen moeglich |
+| Fachliche Aktualitaet | Tests pruefen Struktur und UI-Verhalten, nicht Produktwahrheit |
+
+## 8. Aenderung -> empfohlene Validierung
+
+| Aenderung | Mindestens ausfuehren | Warum |
+|---|---|---|
+| `copilot-instruments.json` | `tests\integrity.spec.js`, `cockpit.spec.js`, plus betroffene Seitenspec(s) | Hub-Datei mit breiter Wirkung |
+| `copilot-models.json` | `runway.spec.js`, `tower.spec.js`, optional `cockpit.spec.js`, `integrity.spec.js` | Runway/Tower und Cockpit-EICAS betroffen |
+| `governance-controls.json` | `tower.spec.js`, `integrity.spec.js`, ggf. `cockpit.spec.js` | Deep Links und Search-Index betroffen |
+| `security-threats.json` oder `security-frameworks.json` | `security.spec.js`, `integrity.spec.js`, ggf. `cockpit.spec.js` | Scanner und Security-Callouts betroffen |
+| `wiring-diagram.json` | `wiring.spec.js`, `integrity.spec.js` | Graph und Referenzen betroffen |
+| `terminal-guide.json` | `terminal.spec.js` | reiner Content, page-lokal |
+| `jet-bridge-guide.json` | `jet-bridge.spec.js` | reiner Content, page-lokal |
+| `preflight-checklist.json` | `preflight.spec.js`, `integrity.spec.js` falls IDs referenziert werden | Persistenz und Fortschritt |
+| `app.js` | `cockpit.spec.js` plus angrenzende Seitenspecs | zentrale Runtime |
+| `search.js` | `cockpit.spec.js`, dazu manuelle Plausibilisierung auf weiteren Seiten | globale Suche wirkt seitenuebergreifend |
+| Navigation / Theme / Layout | mehrere Seitenspecs, mindestens eine pro Perspektivenfamilie | Logik ist dupliziert |
+
+## 9. Nützliche Kommandos
 
 ```bash
-# Gesamte Suite
 npm test
-
-# Einzelne Seite pruefen
-npx playwright test tests/tower.spec.js
-npx playwright test tests/security.spec.js
 npx playwright test tests/runway.spec.js
-
-# Nur Datenintegritaet
+npx playwright test tests/security.spec.js
 npx playwright test tests/integrity.spec.js
+npx playwright test --grep "page load"
 ```
 
-## 9. Teststrategie fuer Dokumentations- und Datenaenderungen
+## 10. Validierungsreihenfolge fuer typische Changes
 
-### Bei JSON-Aenderungen
+### Datenaenderung
 
-Mindestens sinnvoll:
+1. `tests/integrity.spec.js`
+2. direkt betroffene Seitenspec
+3. bei Hub-Daten: angrenzende Seitenspecs
 
-- `tests/integrity.spec.js`
-- die betroffene Seitenspec, z. B.:
-  - `tests/runway.spec.js` fuer `copilot-models.json`
-  - `tests/security.spec.js` fuer `security-threats.json`
-  - `tests/tower.spec.js` fuer `governance-controls.json` oder `sovereign-cloud.json`
+### UI-/JS-Aenderung
 
-### Bei HTML-/JS-Aenderungen
+1. betroffene Seitenspec
+2. bei gemeinsamem Pattern: weitere Seiten mit derselben Logik
+3. bei Navigation/Theme/Search: Cockpit plus mindestens eine Nicht-Cockpit-Seite
 
-Mindestens sinnvoll:
+### Doku-Only in diesem Repo
 
-- betroffene Seitenspec
-- `tests/cockpit.spec.js`, falls `app.js`, `search.js` oder gemeinsame Navigation betroffen ist
+Keine automatische Testpflicht in diesem Doku-Repo. Trotzdem sollten Zahlen, Dateinamen, Pfade und Aussagen gegen `C:\temp\copilot-cockpit` gegengeprueft werden.
 
-## 10. Fazit
-
-Die Test-Suite ist fuer ein rein statisches Repo ungewoehnlich tief: Sie sichert nicht nur Rendering, sondern auch **Deep-Link-Vertraege, Persistenz, Datenreferenzen und wichtige fachliche Integrationen**. Gerade fuer dieses Projekt ist das entscheidend, weil Inhalt und Laufzeitverhalten direkt aus JSON-Katalogen erzeugt werden.
+Weiterfuehrend: [`DATA-CATALOG.md`](DATA-CATALOG.md), [`OPERATIONS.md`](OPERATIONS.md), [`CONTRIBUTING.md`](CONTRIBUTING.md)

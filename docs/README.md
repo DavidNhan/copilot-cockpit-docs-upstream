@@ -1,58 +1,68 @@
-# Copilot Cockpit — Technische Dokumentation
+# Dokumentationsindex
 
-Diese Dokumentation beschreibt das Quell-Repo `C:\temp\copilot-cockpit` als **statische, datengetriebene Multi-Page-Webanwendung**. Es gibt keinen Backend-Service und keinen Build-Schritt; jede HTML-Seite lädt ihre JSON-Daten direkt per `fetch()` und rendert den Inhalt im Browser.
+Diese Dokumentation beschreibt das Quell-Repo `C:\temp\copilot-cockpit` aus Entwickler- und Betreiberperspektive. Fokus ist die **technische Realität**: Seiten, Daten, Fluesse, Tests und Betrieb.
 
-## System auf einen Blick
+## Schnellueberblick
 
-| Bereich | Dateien | Aufgabe |
+| Thema | Kernaussage |
+|---|---|
+| App-Typ | Statische Multi-Page-Anwendung |
+| Routing | Dateibasierte Navigation plus Hash-Deep-Links |
+| Datenzugriff | Browser-`fetch()` auf `data\*.json` |
+| Wiederverwendung | `styles.css`, `search.js`, Theme-Persistenz, kopierte Header/Footer |
+| Testen | Playwright E2E plus Integritaetschecks gegen JSON |
+| Deploy | Statisches Output-Verzeichnis `.` mit Vercel-Cache-Regeln |
+
+## Leserpfade
+
+### 1. Fuer neue Maintainer
+
+1. [`../README.md`](../README.md)
+2. [`ARCHITECTURE.md`](ARCHITECTURE.md)
+3. [`DATA-CATALOG.md`](DATA-CATALOG.md)
+4. [`TESTING-GUIDE.md`](TESTING-GUIDE.md)
+
+### 2. Fuer Aenderungen an einer konkreten Seite
+
+1. [`API-REFERENCE.md`](API-REFERENCE.md) - Route, DOM-Roots, Deep Links
+2. [`DATA-CATALOG.md`](DATA-CATALOG.md) - welche JSON-Dateien die Seite liest
+3. [`TESTING-GUIDE.md`](TESTING-GUIDE.md) - welche Specs danach Pflicht sind
+
+### 3. Fuer Architektur- oder Refactoring-Entscheidungen
+
+1. [`ARCHITECTURE.md`](ARCHITECTURE.md)
+2. [`API-REFERENCE.md`](API-REFERENCE.md)
+3. [`OPERATIONS.md`](OPERATIONS.md)
+
+### 4. Fuer Content-Pflege und Release-Vorbereitung
+
+1. [`DATA-CATALOG.md`](DATA-CATALOG.md)
+2. [`OPERATIONS.md`](OPERATIONS.md)
+3. [`CONTRIBUTING.md`](CONTRIBUTING.md)
+4. [`TESTING-GUIDE.md`](TESTING-GUIDE.md)
+
+## Dokumente im Detail
+
+| Datei | Wofuer sie da ist | Besonders hilfreich wenn ... |
 |---|---|---|
-| Seiten-Shells | `index.html`, `terminal.html`, `security.html`, `jet-bridge.html`, `ramp.html`, `runway.html`, `tower.html`, `flight-log.html`, `preflight.html`, `wiring.html` | Perspektiven, Navigation, DOM-Container, page-lokale Scripts |
-| Gemeinsame Assets | `styles.css`, `search.js`, `favicon.svg`, `og-image.png` | Styling, globale Suche, Branding |
-| Hauptlogik Cockpit | `app.js` | Rendern des Cockpit-Grids, Filter, Detail-Blade, Deep Links |
-| Datenkatalog | `data\*.json` | Inhalte fuer Instrumente, Modelle, Controls, Threats, Guides |
-| Tests | `tests\*.spec.js`, `playwright.config.js` | Browser-E2E-Tests plus Integritaetschecks gegen JSON |
-| Deployment | `vercel.json` | Statisches Hosting und Cache-Header |
+| [`ARCHITECTURE.md`](ARCHITECTURE.md) | Systembild, Runtime-Fluesse, Komponenten, Seitenschnitt | du verstehen willst, warum die Anwendung nicht wie eine SPA organisiert ist |
+| [`API-REFERENCE.md`](API-REFERENCE.md) | Referenz fuer HTML-Routen, DOM-Roots, Hash-Kontrakte, Interaktionen | du wissen musst, wo eine Funktion technisch einhaengt |
+| [`DATA-CATALOG.md`](DATA-CATALOG.md) | Vollstaendige JSON-Karte mit Konsumenten und Pflegehinweisen | du Daten aenderst oder neue Inhalte einhaengst |
+| [`TESTING-GUIDE.md`](TESTING-GUIDE.md) | Struktur und Taktik der Playwright-Suite | du Aenderungen verifizieren oder Testumfang zuschneiden willst |
+| [`OPERATIONS.md`](OPERATIONS.md) | Deployment, Cache-Verhalten, Content-Refresh, Risiken | du die Site betreibst oder ein Problem eingrenzt |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | Arbeitsregeln fuer Doku- und Codebeitraege | du konsistent beitragen und sauber reviewen willst |
 
-## Seiten und Zweck
+## Wichtige Grundsaetze
 
-| Seite | Datei | Datenquelle(n) | Zweck |
-|---|---|---|---|
-| Cockpit | `index.html` + `app.js` | `data/copilot-instruments.json` plus optionale Enrichment-Dateien | Hauptansicht mit Instrumenten-Grid, Filtern und Detail-Blade |
-| Terminal | `terminal.html` | `data/terminal-guide.json` | Einstieg: Plaene, IDE-Setup, erste Uebungen |
-| Jet Bridge | `jet-bridge.html` | `data/jet-bridge-guide.json` | Prompting, Kontext, Edit Mode, Agent-Patterns |
-| Ramp | `ramp.html` | `data/copilot-instruments.json` | Agenten, MCP, Ground-Handling-Perspektive |
-| Runway | `runway.html` | `data/copilot-models.json` | Modellkatalog, Handover-Topologie, NOTAMs |
-| Security | `security.html` | `data/copilot-instruments.json`, `data/security-threats.json`, `data/security-frameworks.json` | X-Ray-Scanner, Threat Models, Hardening |
-| Tower | `tower.html` | `data/governance-controls.json`, `data/copilot-models.json`, `data/sovereign-cloud.json` | Governance, Compliance, Souveraenitaet |
-| Flight Log | `flight-log.html` | `data/known-changelog-entries.json` | Changelog-Timeline |
-| Pre-Flight | `preflight.html` | `data/preflight-checklist.json` | Interaktive Rollout-Checkliste |
-| Wiring | `wiring.html` | `data/wiring-diagram.json`, `data/copilot-instruments.json` | Mermaid-Graph fuer Feature-Beziehungen |
+1. **Keine Backend-API erfinden.** Die API-Oberflaeche dieses Repos besteht aus HTML-Seiten, JSON-Dateien, Hash-Kontrakten und externen CDN-Skripten.
+2. **Den Hub beachten.** `copilot-instruments.json` ist die wichtigste Referenzdatei fuer mehrere andere Kataloge.
+3. **Verifikation nicht ueberspringen.** Teile des Modells- und Framework-Katalogs markieren sich selbst als noch nicht abschliessend verifiziert.
+4. **Seiten lokal denken.** Viele Muster wiederholen sich, aber die meisten Perspektiven besitzen ihre eigene Renderlogik.
 
-## Wichtige technische Merkmale
+## Wo die Doku bewusst vorsichtig formuliert
 
-1. **Statische MPA statt SPA**: Jede HTML-Datei ist ein eigener Einstiegspunkt.
-2. **JSON als API-Ersatz**: Die komplette Fachlogik wird aus `data\*.json` gespeist.
-3. **Gemeinsame UI-Bausteine**: `styles.css` und `search.js` werden auf fast allen Seiten wiederverwendet.
-4. **Hash-basierte Navigation**: Details werden ueber `#instrument-...`, `#model-...`, `#scan=...`, `#control=...` und `#sovereign=...` adressiert.
-
-## Beispiel: Cockpit-Bootstrap
-
-Aus `app.js`:
-
-```js
-const [resp, threatsResp, governanceResp, modelsResp] = await Promise.all([
-    fetch('data/copilot-instruments.json'),
-    fetch('data/security-threats.json').catch(() => null),
-    fetch('data/governance-controls.json').catch(() => null),
-    fetch('data/copilot-models.json').catch(() => null)
-]);
-```
-
-Das Muster ist typisch fuer das Repo: **eine Pflichtquelle plus optionale Zusatzdaten**.
-
-## Doku-Navigation
-
-- [`ARCHITECTURE.md`](./ARCHITECTURE.md) — Datenfluesse, Seitenstruktur, Komponenten
-- [`API-REFERENCE.md`](./API-REFERENCE.md) — HTML-Endpunkte, Deep Links, `fetch()`-Calls
-- [`DATA-CATALOG.md`](./DATA-CATALOG.md) — alle JSON-Dateien unter `data\`
-- [`TESTING-GUIDE.md`](./TESTING-GUIDE.md) — Playwright-Setup, Spec-Dateien, Abdeckung
+| Thema | Warum vorsichtig? |
+|---|---|
+| Modell- und Surface-Aussagen | `copilot-models.json` markiert sich selbst als verifikationspflichtig. |
+| Sicherheits-Framework-Mappings | `security-frameworks.json` enthaelt explizite Hinweise auf manuelle Nachpruefung. |
+| Zaehlerstaende in Kommentaren | Einzelne Tests und Inhaltsdateien enthalten historische Zahlen, die nicht mehr den aktuellen Katalog abbilden. |
