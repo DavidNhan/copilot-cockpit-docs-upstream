@@ -1,148 +1,246 @@
-# Data Catalog
+# Data catalog
 
-## 1. Datenlandschaft in einem Satz
+The site is data-driven. Most page content is authored in JSON and rendered in the browser rather than hard-coded in HTML.
 
-Alle produktiven Inhalte der Site liegen als statische JSON-Dateien unter `C:\temp\copilot-cockpit\data\`. Die wichtigste Wartungsfrage ist nicht "welche Seite zeigt das an?", sondern **welche IDs und Querverweise haengen daran?**
+## Catalog inventory
 
-## 2. Hub-Kataloge mit hoher Kopplung
+| File | Main collection size | Primary consumers | Verification signal |
+| --- | ---: | --- | --- |
+| `data/copilot-instruments.json` | 46 instruments | cockpit, security, ramp, wiring, search | none |
+| `data/copilot-models.json` | 21 models | cockpit, runway, tower, search | `verificationRequired: true` |
+| `data/governance-controls.json` | 20 controls | cockpit, tower, search, wiring | `verificationRequired: false` |
+| `data/security-threats.json` | 22 threats | cockpit, security | none |
+| `data/security-frameworks.json` | registry object | security | `verificationRequired: true` |
+| `data/sovereign-cloud.json` | 6 deployment options | tower | none |
+| `data/terminal-guide.json` | 4 major sections | terminal | none |
+| `data/jet-bridge-guide.json` | 5 major sections | jet bridge | none |
+| `data/preflight-checklist.json` | 6 categories, 22 items | pre-flight | none |
+| `data/known-changelog-entries.json` | 35 entries | flight log, search | none |
+| `data/wiring-diagram.json` | 55 connections | wiring | none |
 
-| Datei | Top-Level-Vertrag | Konsumenten | Kritische Kopplungen | Verifikationsstatus |
-| --- | --- | --- | --- | --- |
-| `copilot-instruments.json` | `zones[]`, `plans[]`, `instruments[]` | Cockpit, Ramp, Security, Wiring, Search | Instrument-IDs werden von Changelog, Wiring, `relatedInstruments`, Search und Deep Links genutzt. | keine globale `verificationRequired`-Flagge |
-| `copilot-models.json` | `capabilities[]`, `surfaces[]`, `plans[]`, `models[]`, `notams[]`, `copilotEngine`, `flightPlans[]` | Runway, Tower, Cockpit-EICAS, Search | Modell-IDs und Verfuegbarkeiten wirken in Runway, Search und Cockpit-Bridge. | `verificationRequired: true` |
-| `governance-controls.json` | `sources`, `controls[]` | Tower, Cockpit, Search, Wiring-Integritaet | Control-IDs sind Hash-Ziele und duerfen in `wiring-diagram.json` vorkommen. | `verificationRequired: false` |
-| `known-changelog-entries.json` | `entryTypes`, `entries[]` | Flight Log, Search, Integritaetstests | `entries[].instruments[]` muessen auf bekannte Instrumente zeigen. | keine globale Flagge |
-| `wiring-diagram.json` | `connectionTypes[]`, `connections[]`, `zoneDescriptions` | Wiring, Integritaetstests | `connections[].from/to` muessen Instrumente oder Controls adressieren. | keine globale Flagge |
+## Core schema shapes
 
-Diese Dateien sollten vor jeder strukturellen Aenderung zusammen mit [TESTING-GUIDE.md](TESTING-GUIDE.md) betrachtet werden.
+### `data/copilot-instruments.json`
 
-## 3. Fachkataloge mit mittlerer Kopplung
+Top-level keys:
 
-| Datei | Rolle | Konsumenten | Wartungshinweis |
-| --- | --- | --- | --- |
-| `security-threats.json` | Threat-Modelle, Gegenmassnahmen und Demo-Snippets pro Instrument | Security, Cockpit | `threats[].instrumentId` muss auf ein existierendes Instrument verweisen. |
-| `security-frameworks.json` | Framework-/CWE-Mapping fuer Security | Security | Viele Eintraege sind explizit `verified: false`; keine staerkeren Aussagen als die Datei selbst machen. |
-| `sovereign-cloud.json` | Deploymentoptionen, Restrisiken und Mermaid-Daten fuer Tower | Tower | Enthaelt strukturierte Inhalte **und** Diagrammquelle; Syntax- und Inhaltsfehler wirken direkt in der UI. |
+- `version`
+- `lastUpdated`
+- `zones[]`
+- `plans[]`
+- `instruments[]`
 
-## 4. Page-spezifische Kataloge mit geringer Kopplung
+Observed instrument shape:
 
-| Datei | Konsument | Stabiler Vertrag | Pflegefalle |
-| --- | --- | --- | --- |
-| `terminal-guide.json` | `terminal.html` | `checkIn`, `boardingPass`, `firstFlight`, `departures` | Linkziele in `departures` muessen auf echte Seiten zeigen. |
-| `jet-bridge-guide.json` | `jet-bridge.html` | `promptCraft`, `contextManagement`, `editMode`, `agentPatterns`, `nextSteps` | Intra-page-Struktur ist relativ lokal; kaputte Arrays wirken aber sofort auf das Rendering. |
-| `preflight-checklist.json` | `preflight.html` | `intro`, `categories[]` | Fortschritt lebt in `localStorage`, nicht in der Datei selbst. |
+```json
+{
+  "id": "agent-mode",
+  "symbol": "AGT",
+  "name": "Agent Mode",
+  "zone": "pfd",
+  "perspectives": ["cockpit", "terminal"],
+  "status": "ga",
+  "statusHistory": [{ "status": "preview", "date": "2025-02" }],
+  "description": "...",
+  "shortDescription": "...",
+  "planAvailability": { "free": "limited", "pro": true },
+  "ideSupport": { "vscode": "ga", "jetbrains": "ga" },
+  "flightMode": ["beginner", "advanced"],
+  "capabilities": ["..."],
+  "squawkCodes": [{ "code": "7600", "title": "...", "description": "..." }],
+  "securityRelevance": { "relevant": true, "aspects": ["..."] },
+  "proTip": "...",
+  "links": { "docs": "...", "changelog": "...", "learn": "..." },
+  "relatedInstruments": ["mcp"],
+  "mermaidDiagrams": [],
+  "codeExamples": [],
+  "terminalRecordings": [],
+  "videos": [],
+  "lastVerified": "2026-04-14",
+  "confidenceScore": 95
+}
+```
 
-## 5. Verifizierte Integritaetsregeln aus `tests\integrity.spec.js`
+Important rules:
 
-Die folgenden Regeln sind **harte Datenvertraege**, nicht nur redaktionelle Empfehlungen:
+- `zone` must match `zones[].id`.
+- `id` is the primary foreign key used across the site.
+- `planAvailability` values are mixed: `true`, `false` or omitted, and `"limited"`.
+- `capabilities` can be a string array or an object array; `app.js` handles both.
+- `links` can be an object in instrument data; `app.js` also supports an array form.
 
-| Vertrag | Quelle |
-| --- | --- |
-| jede `entries[].instruments[]`-Referenz zeigt auf ein existierendes Instrument | `known-changelog-entries.json` + `copilot-instruments.json` |
-| jede Wiring-Kante referenziert ein existierendes Instrument oder eine existierende Control | `wiring-diagram.json` + `copilot-instruments.json` + `governance-controls.json` |
-| jede `relatedInstruments`-Referenz zeigt auf ein existierendes Instrument | `copilot-instruments.json` |
-| Instrument-IDs sind eindeutig | `copilot-instruments.json` |
-| Modell-IDs sind eindeutig | `copilot-models.json` |
-| jedes Instrument besitzt `id`, `symbol`, `name`, `zone`, `status` | `copilot-instruments.json` |
-| jedes Instrument nutzt eine definierte Zone | `copilot-instruments.json` |
-| jeder Changelog-Typ ist in `entryTypes` definiert | `known-changelog-entries.json` |
-| jeder Wiring-Typ ist in `connectionTypes` definiert | `wiring-diagram.json` |
+### `data/copilot-models.json`
 
-## 6. Dateispezifische Wartungshinweise
+Top-level keys used by runtime code:
 
-### 6.1 `copilot-instruments.json`
+- metadata: `$schema`, `version`, `lastUpdated`, `verificationRequired`, `verificationNotes`, `description`
+- lookup tables: `sources[]`, `capabilities[]`, `surfaces[]`, `plans[]`
+- content: `models[]`, `notams[]`, `flightPlans[]`, `copilotEngine`
 
-Relevanz:
+Observed model shape:
 
-- primaerer Inhalts- und ID-Hub
-- einzige Quelle fuer Cockpit-Zonen und Instrumentkarten
-- Referenzquelle fuer Ramp, Security, Wiring und Search
+```json
+{
+  "id": "gpt-4-1",
+  "displayName": "GPT-4.1",
+  "provider": "OpenAI",
+  "family": "GPT",
+  "status": "ga",
+  "tagline": "...",
+  "strengths": ["..."],
+  "limitations": [],
+  "contextWindow": 1047576,
+  "capabilities": { "reasoning": "partial", "code": "strong" },
+  "surfaceAvailability": { "chat": true, "inline": true, "coding-agent": true },
+  "planAvailability": { "free": true, "pro": true, "enterprise": true },
+  "pricingMultiplier": 0.0,
+  "releasedAt": "2025-04-14",
+  "knowledgeCutoff": "2024-06-30",
+  "inputModalities": ["image", "text", "file"],
+  "outputModalities": ["text"],
+  "modeAvailability": { "agent": true, "ask": true, "edit": true },
+  "ideAvailability": { "github-com": true, "copilot-cli": true, "vscode": true },
+  "taskArea": "...",
+  "excelsAt": "...",
+  "modelCardUrl": "...",
+  "sourceLinks": ["..."],
+  "confidenceScore": 70,
+  "lastVerified": "2026-04-10",
+  "verificationRequired": true
+}
+```
 
-Pflegehinweise:
+Important rules:
 
-1. Neue Instrumente brauchen stabile `id`, `zone` und `status`.
-2. `relatedInstruments` duerfen nur existierende IDs verwenden.
-3. Aenderungen an `planAvailability`, `perspectives` oder `flightMode` wirken direkt auf Filter- und Sichtbarkeitslogik.
-4. Aenderungen an governance-relevanten Instrumenten koennen Cockpit-Callouts nach `tower.html#control=<id>` beeinflussen.
+- `runway.html` treats `verificationRequired` as a visible warning banner.
+- `app.js` derives cockpit engine-zone links from non-deprecated models only.
+- `flightPlans[].recommendedModels[]` and `avoidModels[]` are expected to resolve to model IDs.
+- `notams[].affectedModels[]` are expected to resolve to model IDs.
 
-### 6.2 `copilot-models.json`
+### `data/governance-controls.json`
 
-Relevanz:
+Top-level keys:
 
-- treibt Runway-Filter, Departure Board, Detail-Blade, NOTAMs und Flight Plans
-- liefert Zusatzdaten fuer Tower und EICAS-Cluster im Cockpit
+- `version`
+- `lastUpdated`
+- `verificationRequired`
+- `description`
+- `sources`
+- `controls[]`
 
-Pflegehinweise:
+Observed control shape:
 
-1. Datei ist selbst als **nicht final verifiziert** markiert; behandle Modellmetadaten entsprechend vorsichtig.
-2. `models[].id` ist Deep-Link-Ziel fuer `#model-<id>`.
-3. `status: deprecated` wirkt sichtbar in Runway-Filtern und Status-LEDs.
-4. `planAvailability`, `surfaceAvailability` und `provider` haben direkte UI-Folgen.
+```json
+{
+  "id": "feature-policies",
+  "category": "policy",
+  "scope": "org",
+  "defaultState": "off",
+  "rolloutEffort": "low",
+  "governanceNote": "...",
+  "complianceRelevance": ["SOC2-CC6.1", "ISO-A.5.15", "GDPR-Art25"]
+}
+```
 
-### 6.3 `governance-controls.json`
+Important rules:
 
-Relevanz:
+- Control IDs double as Tower deep-link identifiers.
+- Some control IDs intentionally align with instrument IDs so the cockpit can render governance callouts from `instrument.id`.
+- Wiring endpoints may reference control IDs as well as instrument IDs.
 
-- steuert Tower-Control-Liste und Compliance-Chips
-- liefert IDs fuer `#control=<id>`
-- dient als moeglicher Endpunkt im Wiring-Graph
+### `data/security-threats.json`
 
-Pflegehinweise:
+Top-level keys:
 
-1. `controls[].id` muss stabil bleiben; Hash-Links und Tests haengen daran.
-2. `sources` definieren den Legendeninhalt fuer Tower.
-3. `verificationRequired: false` ist ein harter Unterschied zu Modellen und Frameworks; nicht angleichen ohne Quellbeleg.
+- `version`
+- `lastUpdated`
+- `description`
+- `schema`
+- `threats[]`
 
-### 6.4 `security-threats.json`
+Observed threat shape:
 
-Relevanz:
+```json
+{
+  "instrumentId": "content-exclusion",
+  "classification": "preventive",
+  "cia": ["confidentiality"],
+  "threatModel": { "title": "...", "diagram": "sequenceDiagram ..." },
+  "scenario": { "severity": "critical", "likelihood": "high", "narrative": "..." },
+  "demo": {
+    "type": "before-after",
+    "vulnerable": { "label": "...", "language": "bash", "filename": "...", "code": "..." },
+    "hardened": { "label": "...", "language": "bash", "filename": "...", "code": "..." }
+  },
+  "countermeasures": ["..."],
+  "blastRadius": "high",
+  "mitigatesCWE": ["CWE-200"],
+  "frameworks": { "owaspLLM": ["LLM02:2025"], "atlas": ["AML.T0057"] }
+}
+```
 
-- steuert Security-Scanner, Risikoszenarien und Demo-Snippets
-- speist in `app.js` einen Scanner-Index fuer Cockpit-Callouts
+Important rules:
 
-Pflegehinweise:
+- `instrumentId` must resolve to an instrument ID.
+- `frameworks` references are resolved against `data/security-frameworks.json`.
+- Mermaid diagrams are stored as strings and rendered at runtime.
 
-1. `instrumentId` ist der wichtigste Vertrag.
-2. Mermaid-Inhalte unter `threatModel.diagram` muessen renderbar bleiben.
-3. `mitigatesCWE[]` und `frameworks` sollten nur Werte verwenden, die zur Framework-Datei passen; das ist logisch notwendig, auch wenn nicht alles per Test abgesichert ist.
+## Guide-style catalogs
 
-### 6.5 `known-changelog-entries.json`
+| File | Top-level structure | Runtime expectation |
+| --- | --- | --- |
+| `data/terminal-guide.json` | `checkIn`, `boardingPass`, `firstFlight`, `departures` | each section renders cards or links in `terminal.html` |
+| `data/jet-bridge-guide.json` | `promptCraft`, `contextManagement`, `editMode`, `agentPatterns`, `nextSteps` | each section renders tutorial cards in `jet-bridge.html` |
+| `data/preflight-checklist.json` | `intro`, `categories[]` | categories include `perspective` links and `items[]` with checkbox IDs |
+| `data/known-changelog-entries.json` | `entryTypes`, `entries[]` | `entries[].type` must resolve into `entryTypes`; `entries[].instruments[]` link back to cockpit instruments |
+| `data/wiring-diagram.json` | `intro`, `connectionTypes[]`, `connections[]`, `zoneDescriptions` | `connections[].type` must resolve into `connectionTypes`; endpoints must resolve to instruments or controls |
+| `data/sovereign-cloud.json` | `sovereignPillars[]`, `deploymentOptions[]`, `providerStrategies[]`, `residualRisks[]`, `dataFlowDiagram`, `sources` | Tower uses these sections directly for sovereignty pages and Mermaid rendering |
+| `data/security-frameworks.json` | `sources`, `frameworks`, `cwePattern` | Security page resolves OWASP LLM, ATLAS, and CWE links from this registry |
 
-Pflegehinweise:
+## Cross-file foreign keys
 
-1. `entryTypes` ist der Typ-Kanon fuer `entries[].type`.
-2. Instrument-Links im Flight Log werden direkt aus `entries[].instruments[]` gebaut.
-3. Search indexiert die Datei mit; Titel und Beschreibung beeinflussen damit auch Suchtreffer.
+| Source | Target | Enforced today |
+| --- | --- | --- |
+| `security-threats.threats[].instrumentId` | `copilot-instruments.instruments[].id` | yes, integrity spec |
+| `known-changelog-entries.entries[].instruments[]` | `copilot-instruments.instruments[].id` | yes, integrity spec |
+| `copilot-instruments.instruments[].relatedInstruments[]` | `copilot-instruments.instruments[].id` | yes, integrity spec |
+| `wiring-diagram.connections[].from/to` | instrument IDs or control IDs | yes, integrity spec |
+| `copilot-instruments.instruments[].zone` | `copilot-instruments.zones[].id` | yes, integrity spec |
+| `known-changelog-entries.entries[].type` | `known-changelog-entries.entryTypes` | yes, integrity spec |
+| `wiring-diagram.connections[].type` | `wiring-diagram.connectionTypes[].id` | yes, integrity spec |
+| `copilot-models.flightPlans[].recommendedModels[]` | `copilot-models.models[].id` | not in integrity spec |
+| `copilot-models.flightPlans[].avoidModels[]` | `copilot-models.models[].id` | not in integrity spec |
+| `copilot-models.notams[].affectedModels[]` | `copilot-models.models[].id` | not in integrity spec |
+| `security-threats.frameworks.*` | `security-frameworks.frameworks.*` | resolved at runtime, not in integrity spec |
 
-### 6.6 `wiring-diagram.json`
+## Validation coverage
 
-Pflegehinweise:
+`tests/integrity.spec.js` is the main automated data guard. It verifies:
 
-1. Jede Kante braucht gueltige `from`, `to` und `type` Werte.
-2. `connectionTypes[]` definiert nicht nur Labels, sondern die erlaubten Kantenklassen.
-3. Die Seite erzeugt klickbare Mermaid-Knoten nach `index.html#instrument-<id>`.
+- no duplicate instrument IDs,
+- no duplicate model IDs,
+- required instrument fields,
+- valid instrument zone references,
+- valid changelog entry types,
+- valid wiring connection types,
+- valid cross-file references for changelog entries, related instruments, and wiring endpoints.
 
-## 7. Datenquellen ausserhalb von `data\`
+What it does **not** currently verify:
 
-| Quelle | Rolle |
-| --- | --- |
-| `tools\enrich\README.md` | beschreibt die Offline-Anreicherung fuer Modellkataloge |
-| `tools\enrich\sources.yml` | registriert Upstream-Quellen fuer Modellanreicherung |
-| `vercel.json` | bestimmt Cache-Verhalten fuer JSON-Auslieferung |
+- model `notams[].affectedModels[]`,
+- model `flightPlans` model references,
+- security framework ID lookups,
+- uniqueness of checklist item IDs across categories,
+- uniqueness of governance control IDs.
 
-Wichtig: Laut `tools\enrich\README.md` ist die Enrichment-Pipeline **nicht** als direkter Writer nach `data\` gedacht. Modellkataloge bleiben damit statische Artefakte des Repos.
+## Maintenance notes
 
-## 8. Aenderungsentscheidungen nach Katalogtyp
+1. Prefer editing JSON when page text already lives in a catalog.
+2. Treat IDs as stable public-ish implementation keys because they appear in hashes, search results, and persisted browser state.
+3. If a catalog contains `verificationRequired: true`, preserve that uncertainty in downstream documentation and UI messaging.
+4. `tools/enrich/` exists only for model catalog maintenance; it is explicitly human-gated and does not auto-write into `data/copilot-models.json`.
 
-| Wenn du aenderst ... | Denke zusaetzlich an ... |
-| --- | --- |
-| ID-Felder | Search, Hashes, Wiring, Changelog, `relatedInstruments`, Playwright |
-| Status-/Plan-/Provider-Felder | Filterlogik, Sichtbarkeit, LED-/Badge-Zustaende |
-| Mermaid-Strings | Rendering in Security, Tower oder Wiring |
-| `verificationRequired` | Dokumentationssprache und Banner/Warnings in der UI |
-| Link-/URL-Felder | externe Zielgueltigkeit und Review-Qualitaet |
+## Explicit uncertainty
 
-## 9. Annahmen
-
-1. **JSON ist der kanonische Vertragsstand.** Wenn Freitext-Kommentare oder README-Passagen aeltere Zaehler nennen, sollte fuer technische Wartung immer die aktuelle JSON-Struktur priorisiert werden.
-2. **Framework-Konsistenz ist fachlich erwartet, aber nicht vollstaendig testseitig erzwungen.** Gerade fuer `security-frameworks.json` braucht es deshalb Review-Disziplin zusaetzlich zur vorhandenen Testbasis.
+- Counts in this file reflect the repository source examined during this pass, not any separately hosted deployment.
+- `data/copilot-models.json` and `data/security-frameworks.json` explicitly flag verification work in progress; do not present them as fully authoritative without a human review.

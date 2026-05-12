@@ -1,129 +1,173 @@
-# Testing Guide
+# Testing guide
 
-## 1. Teststrategie des Repositories
+## Test stack
 
-Das Quell-Repo nutzt **nur Playwright** als automatisierte Testbasis. Es gibt in `package.json` keine separaten Build- oder Lint-Skripte; die technische Absicherung konzentriert sich damit auf:
+The repository uses Playwright only.
 
-1. Seiten-Boot und Rendering
-2. Hash-/Deep-Link-Vertraege
-3. Datenintegritaet zwischen JSON-Katalogen
-4. einige Integrationsbruecken zwischen Perspektiven
+| File | Role |
+| --- | --- |
+| `package.json` | exposes `npm test` as `npx playwright test` |
+| `playwright.config.js` | sets `tests/`, base URL, Chromium project, and a local static `webServer` |
+| `tests/*.spec.js` | page-level end-to-end coverage plus JSON integrity checks |
 
-## 2. Verifizierte Runner-Konfiguration
+Key Playwright settings currently in force:
 
-| Einstellung | Quelle | Wert |
-| --- | --- | --- |
-| Standardbefehl | `package.json` | `npm test` -> `npx playwright test` |
-| Testverzeichnis | `playwright.config.js` | `./tests` |
-| Browser | `playwright.config.js` | `chromium` |
-| Base URL | `playwright.config.js` | `http://localhost:3000` |
-| Lokaler Server | `playwright.config.js` | `python3 -m http.server 3000 --bind 127.0.0.1` |
-| Reporter | `playwright.config.js` | `list` |
-| Retries in CI | `playwright.config.js` | `2` |
+- `testDir: './tests'`
+- `baseURL: 'http://localhost:3000'`
+- `reporter: 'list'`
+- Chromium-only project
+- local server command: `python3 -m http.server 3000 --bind 127.0.0.1`
 
-## 3. Standardbefehle
+## How to run the suite
 
-Aus `C:\temp\copilot-cockpit`:
+Run everything:
 
 ```bash
 npm test
 ```
 
-Einzelspezifikation:
+Run a single spec:
 
 ```bash
-npx playwright test tests/tower.spec.js
+npx playwright test tests/runway.spec.js
 ```
 
-Falls Chromium lokal noch nicht installiert ist:
+Environment prerequisites implied by the repo:
+
+- Node.js and npm
+- Playwright browser binaries
+- `python3` on `PATH` for the local static server
+
+First-time setup in a clean workspace is therefore:
 
 ```bash
+npm install
 npx playwright install chromium
 ```
 
-## 4. Suite-Inventar
+## Current suite size
 
-Die Testfallzahlen unten sind direkt aus den eingecheckten `test(`-Aufrufen abgeleitet.
+The current test source declares **222 tests across 11 spec files**.
 
-| Spezifikation | Testfaelle | Fokus |
+| Spec file | Declared tests | Coverage summary |
 | --- | ---: | --- |
-| `tests\cockpit.spec.js` | 29 | Cockpit-Grid, Detailpanel, Theme, Instrument-Deep-Links |
-| `tests\flight-log.spec.js` | 15 | Changelog-Rendering, Instrument-Links |
-| `tests\integrity.spec.js` | 9 | JSON-Referenzen, Pflichtfelder, Duplikate, Zonen, Typen |
-| `tests\jet-bridge.spec.js` | 17 | Jet-Bridge-Seitenstruktur und Guide-Rendering |
-| `tests\preflight.spec.js` | 13 | Checkliste, Progress-State, Persistenz |
-| `tests\ramp.spec.js` | 15 | Ramp-Rendering und `#instrument-<id>` |
-| `tests\runway.spec.js` | 31 | Modellkatalog, Blade, Topologie, NOTAMs, `#model-<id>` |
-| `tests\security.spec.js` | 37 | Security-Scanner, Threat-Links, Persistenz, Cockpit-Bridge |
-| `tests\terminal.spec.js` | 17 | Terminal-Seitenstruktur und Guide-Rendering |
-| `tests\tower.spec.js` | 25 | Controls, Sovereign Cloud, Flight Plans, `#control=`, `#sovereign=` |
-| `tests\wiring.spec.js` | 14 | Wiring-Graph, Diagramm, Links |
-| **Summe** | **222** |  |
+| `tests/cockpit.spec.js` | 29 | cockpit boot, zones, blade behavior, deep links, theme, filters, code and media tabs, cockpit-local search |
+| `tests/terminal.spec.js` | 17 | terminal structure, plan cards, IDE cards, exercises, departures |
+| `tests/security.spec.js` | 37 | scanner behavior, Mermaid threat diagrams, framework links, `localStorage`, cockpit bridge, print button |
+| `tests/jet-bridge.spec.js` | 17 | prompt craft, context management, edit workflows, agent patterns, next steps |
+| `tests/ramp.spec.js` | 15 | ramp cards, blade lifecycle, deep links, metaphor key |
+| `tests/runway.spec.js` | 31 | filters, departure board, model blade, topology, NOTAMs, engine, cockpit bridge |
+| `tests/tower.spec.js` | 25 | governance controls, frameworks, sovereignty views, flight plans, deep links |
+| `tests/flight-log.spec.js` | 15 | timeline render, filters, entry content, nav, theme |
+| `tests/preflight.spec.js` | 13 | checklist render, progress, `localStorage`, reset |
+| `tests/wiring.spec.js` | 14 | graph render, filters, legend, zones, stats |
+| `tests/integrity.spec.js` | 9 | cross-file data integrity and duplicate-ID checks |
 
-## 5. Welche Aenderung welche Tests triggert
+## Observed baseline during this documentation pass
 
-| Geaenderter Bereich | Relevante Spezifikationen |
+One full run was executed after installing npm dependencies and Playwright Chromium.
+
+| Result | Count |
+| --- | ---: |
+| Passed | 216 |
+| Failed | 6 |
+
+All 6 observed failures are in `tests/cockpit.spec.js` and center on cockpit filter or search expectations:
+
+1. `Page Load › shows instrument count in header after filter interaction`
+2. `Filters › flight mode filter dims non-matching instruments`
+3. `Filters › plan filter works`
+4. `Filters › status filter shows only GA or Preview`
+5. `Search › filters instruments by name`
+6. `Search › / focuses search when page has focus`
+
+This is useful context for contributors: the repository currently has a known non-green baseline in the cockpit filter and search area.
+
+## Coverage themes
+
+### 1. Page boot and rendering
+
+Most page specs assert:
+
+- no page errors or unexpected console errors,
+- expected landmarks render,
+- active navigation state is correct,
+- data-backed cards, rows, or timeline entries are present.
+
+### 2. Deep-link coverage
+
+The suite explicitly covers:
+
+| Contract | Covered in |
 | --- | --- |
-| `index.html`, `app.js` | `cockpit.spec.js`, plus Bruecken nach `security.spec.js`, `tower.spec.js`, `runway.spec.js` |
-| `search.js` | betroffene Zielseiten-Smokes, Deep-Link-Verhalten, Suchziele manuell mitpruefen |
-| `data\copilot-instruments.json` | `cockpit.spec.js`, `ramp.spec.js`, `security.spec.js`, `wiring.spec.js`, `flight-log.spec.js`, `integrity.spec.js` |
-| `data\copilot-models.json` | `runway.spec.js`, `tower.spec.js`, `integrity.spec.js` |
-| `data\governance-controls.json` | `tower.spec.js`, `integrity.spec.js`, Cockpit-Governance-Bridge |
-| `data\security-threats.json` / `data\security-frameworks.json` | `security.spec.js`, Cockpit-Security-Bridge |
-| `data\known-changelog-entries.json` | `flight-log.spec.js`, `integrity.spec.js`, Search-Ziele |
-| `data\wiring-diagram.json` | `wiring.spec.js`, `integrity.spec.js` |
-| `data\preflight-checklist.json` | `preflight.spec.js` |
-| `data\terminal-guide.json` | `terminal.spec.js` |
-| `data\jet-bridge-guide.json` | `jet-bridge.spec.js` |
+| `#instrument-<id>` on cockpit | `tests/cockpit.spec.js` |
+| `#scan=<id>` on security | `tests/security.spec.js` |
+| `#instrument-<id>` on ramp | `tests/ramp.spec.js` |
+| `#model-<id>` on runway | `tests/runway.spec.js` |
+| `#control=<id>` and `#sovereign=<id>` on tower | `tests/tower.spec.js` |
 
-## 6. Datenintegritaet als eigener Testlayer
+### 3. Persistence coverage
 
-`tests\integrity.spec.js` ist der wichtigste nicht-visuelle Vertragstest. Er prueft:
+The suite directly exercises:
 
-- gueltige Instrument-Referenzen aus dem Changelog
-- gueltige Endpunkte in Wiring-Kanten
-- gueltige `relatedInstruments`
-- eindeutige Instrument- und Modell-IDs
-- Pflichtfelder pro Instrument
-- gueltige Zonen
-- gueltige Changelog-Typen
-- gueltige Wiring-Typen
+- `cockpit-theme`
+- `cockpit-last-scan`
+- `cockpit-security-posture`
+- `copilot-preflight`
 
-Wenn eine Datenaenderung mehrere Seiten treffen kann, sollte `integrity.spec.js` immer zu den ersten Revalidierungen gehoeren.
+### 4. Rich-rendering coverage
 
-## 7. Lokal vorausgesetzte Umgebung
+The suite checks that Mermaid-based sections render to SVG on:
 
-| Voraussetzung | Warum |
+- Security
+- Runway
+- Tower
+- Wiring
+
+It also checks Prism-based code highlighting in the cockpit Code tab.
+
+### 5. Data integrity coverage
+
+`tests/integrity.spec.js` validates:
+
+- duplicate instrument IDs,
+- duplicate model IDs,
+- required instrument fields,
+- valid zone references,
+- valid changelog entry types,
+- valid wiring connection types,
+- cross-file reference integrity for changelog, wiring, and related instruments.
+
+## Coverage limits and known gaps
+
+| Gap | Why it matters |
 | --- | --- |
-| Node.js / npm | benoetigt fuer Playwright-Runner |
-| `python3` auf PATH | Playwright startet den lokalen Static Server genau damit |
-| installierter Chromium-Browser fuer Playwright | einziges konfiguriertes Browserprojekt |
+| No dedicated spec for the global `search.js` overlay | command-palette ranking, result composition, and keyboard navigation can regress without direct detection |
+| No visual-regression baseline | layout and styling regressions can pass functional checks |
+| No explicit accessibility audit | keyboard and ARIA behavior are only partially covered |
+| No runtime corruption tests for `cockpit-security-posture` | malformed storage JSON can still break Security page state |
+| No assertion of Vercel headers or cache behavior | deployment-time caching issues are outside the current suite |
+| No integrity checks for model `flightPlans` or `notams` references | some model cross-links are trusted at runtime rather than validated centrally |
 
-Der lokale Testpfad ist also **statisches Serving plus Browser-Automation**, nicht Build + Test.
+## Coverage scope by risk area
 
-## 8. Was ein Fehlschlag typischerweise bedeutet
-
-| Fehlbild | Naheliegende Ursache |
+| Risk area | Current protection |
 | --- | --- |
-| Hash-Tests schlagen fehl | ID-Drift, geaenderte History-/Hash-Logik oder falscher Linkaufbau |
-| Wiring-/Integrity-Tests schlagen fehl | kaputte Referenzen zwischen JSON-Dateien |
-| Runway-/Tower-Counts schlagen fehl | Modell-/Control-Katalog oder Filter-/Renderlogik geaendert |
-| Security-Tests schlagen fehl | Inkonsistenz zwischen Instrumenten, Threats und Frameworks |
-| Theme-/Persistenztests schlagen fehl | `localStorage`-Key oder Toggle-Logik geaendert |
+| Broken page boot | strong page-level coverage |
+| Broken hash routes | strong for cockpit, security, ramp, runway, and tower |
+| Broken theme persistence | moderate, covered on cockpit, security, and flight log |
+| Broken cross-catalog IDs | moderate, covered by `integrity.spec.js` for major joins |
+| Broken global search overlay | weak, no dedicated spec |
+| Cache and deployment regressions | weak, not exercised in Playwright |
 
-## 9. Nicht abgedeckte oder nur indirekt abgedeckte Bereiche
+## Suggested contributor workflow
 
-| Bereich | Status |
-| --- | --- |
-| `tools\enrich\*` | keine eigene Test-Suite im Repo sichtbar |
-| Deployment auf Vercel | keine separate Deploy-Testdefinition im Repo sichtbar |
-| Demo-Aufnahme-Workflow | kein Teil der Playwright-Suite |
-| Docs in diesem Ziel-Repo | keine repo-lokalen Docs-Checks im Quell-Repo deklariert |
+1. Run `npm test`.
+2. Change JSON or runtime code.
+3. Update the closest page-specific spec.
+4. If IDs or relationships changed, review `tests/integrity.spec.js`.
+5. Re-run `npm test`.
 
-## 10. Review-Empfehlung fuer Maintainer
+## Explicit assumption
 
-1. Starte bei Datenaenderungen mit `integrity.spec.js` und der betroffenen Seitenspezifikation.
-2. Bei Hash- oder Suchaenderungen immer mindestens einen realen Deep Link pruefen.
-3. Bei Aenderungen an `verificationRequired`-Katalogen nicht nur UI, sondern auch Formulierung in Docs und Banner-Texte reviewen.
-
-Weiterfuehrend: [API-REFERENCE.md](API-REFERENCE.md), [DATA-CATALOG.md](DATA-CATALOG.md), [OPERATIONS.md](OPERATIONS.md)
+- The test counts above are source-derived counts of `test(...)` declarations in the current repository state. No dynamically generated tests were observed.

@@ -1,237 +1,195 @@
-# Architektur
+# Architecture
 
-## 1. Verifiziertes Laufzeitmodell
+## System summary
 
-`C:\temp\copilot-cockpit` ist eine **statische Multi-Page-Anwendung**:
+Copilot Cockpit is a static multi-page site. Root HTML pages load shared CSS, sometimes load shared JavaScript, fetch JSON catalogs directly from `data/`, and render in the browser. There is no bundler, API server, SPA router, or server-side rendering layer in this repository.
 
-- kein Backend
-- kein API-Server
-- kein Build-Artefaktverzeichnis
-- kein Bundler oder Transpiler
-- Rendering direkt im Browser aus `data\*.json`
-
-Der Standardablauf ist pro Seite gleich:
-
-1. Browser laedt eine HTML-Datei aus dem Repo-Root.
-2. Die Seite bindet `styles.css` und optional gemeinsame Laufzeitdateien ein.
-3. JavaScript laedt genau die benoetigten JSON-Dateien aus `data\`.
-4. Das Skript rendert DOM-Strukturen clientseitig.
-5. Hashes und `localStorage` konservieren Navigations- bzw. UI-Zustand.
-
-## 2. Architekturdiagramm
+## Repository-level architecture diagram
 
 ```mermaid
-graph LR
-    subgraph Pages["HTML entry points"]
-        IDX["index.html<br/>Cockpit"]
-        TERM["terminal.html"]
-        JET["jet-bridge.html"]
-        RAMP["ramp.html"]
-        RUN["runway.html"]
-        TOW["tower.html"]
-        SEC["security.html"]
-        LOG["flight-log.html"]
-        PRE["preflight.html"]
-        WIR["wiring.html"]
+flowchart TD
+    subgraph Pages
+        IDX[index.html<br/>Cockpit]
+        TERM[terminal.html]
+        SEC[security.html]
+        JB[jet-bridge.html]
+        RAMP[ramp.html]
+        RUN[runway.html]
+        TWR[tower.html]
+        LOG[flight-log.html]
+        PREF[preflight.html]
+        WIRE[wiring.html]
     end
 
-    subgraph Shared["Shared runtime"]
-        APP["app.js<br/>Cockpit renderer"]
-        SEARCH["search.js<br/>Global search index + palette"]
-        CSS["styles.css"]
+    subgraph Shared_Runtime
+        APP[app.js<br/>cockpit renderer]
+        SEARCH[search.js<br/>global command palette]
+        CSS[styles.css<br/>shared layout + theme]
+        CDN[Mermaid + Prism + Google Fonts]
+        VERCEL[Vercel static hosting<br/>cache headers]
     end
 
-    subgraph Data["JSON catalogs under data/"]
-        INST["copilot-instruments.json"]
-        MOD["copilot-models.json"]
-        GOV["governance-controls.json"]
-        THR["security-threats.json"]
-        FRM["security-frameworks.json"]
-        TERMD["terminal-guide.json"]
-        JETD["jet-bridge-guide.json"]
-        CHG["known-changelog-entries.json"]
-        PREF["preflight-checklist.json"]
-        WIRD["wiring-diagram.json"]
-        SOV["sovereign-cloud.json"]
+    subgraph JSON_Catalogs
+        INST[copilot-instruments.json]
+        MODELS[copilot-models.json]
+        GOV[governance-controls.json]
+        THREATS[security-threats.json]
+        FRAMEWORKS[security-frameworks.json]
+        SOVEREIGN[sovereign-cloud.json]
+        TERMINAL[terminal-guide.json]
+        JET[jet-bridge-guide.json]
+        CHANGELOG[known-changelog-entries.json]
+        PREFLIGHT[preflight-checklist.json]
+        WIRING[wiring-diagram.json]
     end
 
-    IDX --> APP
-    IDX --> SEARCH
-    TERM --> SEARCH
-    JET --> SEARCH
-    RAMP --> SEARCH
-    RUN --> SEARCH
-    TOW --> SEARCH
-    SEC --> SEARCH
-    LOG --> SEARCH
-    PRE --> SEARCH
-    WIR --> SEARCH
+    APP --> IDX
+    SEARCH --> IDX
+    SEARCH --> TERM
+    SEARCH --> SEC
+    SEARCH --> JB
+    SEARCH --> RAMP
+    SEARCH --> RUN
+    SEARCH --> TWR
+    SEARCH --> LOG
+    SEARCH --> PREF
+    SEARCH --> WIRE
+    CSS --> Pages
+    CDN --> Pages
+    VERCEL --> Pages
 
-    IDX --> CSS
-    TERM --> CSS
-    JET --> CSS
-    RAMP --> CSS
-    RUN --> CSS
-    TOW --> CSS
-    SEC --> CSS
-    LOG --> CSS
-    PRE --> CSS
-    WIR --> CSS
+    INST --> APP
+    THREATS --> APP
+    GOV --> APP
+    MODELS --> APP
 
-    APP --> INST
-    APP -. optional .-> THR
-    APP -. optional .-> GOV
-    APP -. optional .-> MOD
+    TERMINAL --> TERM
+    INST --> SEC
+    THREATS --> SEC
+    FRAMEWORKS --> SEC
+    JET --> JB
+    INST --> RAMP
+    MODELS --> RUN
+    GOV --> TWR
+    MODELS --> TWR
+    SOVEREIGN --> TWR
+    CHANGELOG --> LOG
+    PREFLIGHT --> PREF
+    WIRING --> WIRE
+    INST --> WIRE
 
-    SEARCH --> INST
-    SEARCH -. optional .-> GOV
-    SEARCH -. optional .-> MOD
-    SEARCH -. optional .-> CHG
-
-    TERM --> TERMD
-    JET --> JETD
-    RAMP --> INST
-    RUN --> MOD
-    TOW --> GOV
-    TOW --> MOD
-    TOW --> SOV
-    SEC --> INST
-    SEC --> THR
-    SEC --> FRM
-    LOG --> CHG
-    PRE --> PREF
-    WIR --> WIRD
-    WIR --> INST
+    INST --> SEARCH
+    GOV --> SEARCH
+    MODELS --> SEARCH
+    CHANGELOG --> SEARCH
 ```
 
-## 3. Seiten-, Skript- und Daten-Topologie
+## Shared runtime responsibilities
 
-| Ebene | Dateien | Technische Rolle |
+| File | Responsibility | Notes |
 | --- | --- | --- |
-| Cockpit-Kern | `index.html` + `app.js` | Hauptgrid, Detailpanel, Filterleiste, Cross-Perspective-Callouts |
-| Globale Suche | `search.js` | Baut den quellenuebergreifenden Suchindex und oeffnet die Command-Palette |
-| Shared UI | `styles.css` | Layout, Thema, Karten, Blades, Suchpalette |
-| Perspektivseiten | `terminal.html`, `jet-bridge.html`, `ramp.html`, `runway.html`, `tower.html`, `security.html`, `flight-log.html`, `preflight.html`, `wiring.html` | Page-lokale Renderpipelines fuer einzelne Themenbereiche |
-| Datenkataloge | `data\*.json` | Kanonische Inhaltsquellen fuer Rendering und viele Cross-Page-Links |
-| Tests | `tests\*.spec.js` | E2E- und Datenvertrags-Schutz fuer Rendering, Hashes und Referenzen |
+| `app.js` | Bootstraps `index.html`, fetches cockpit data, derives indexes, renders the cockpit grid, detail blade, filters, cockpit-local search box behavior, theme toggle, Mermaid, Prism, and instrument deep links | Only external page controller in the repo |
+| `search.js` | Builds an in-memory cross-page index from instruments, controls, models, and changelog entries; provides `Ctrl+K` or `Cmd+K` overlay navigation | Loaded on all root pages |
+| `styles.css` | Shared tokens, layouts, HUD styling, theme handling, blades, tables, filters, and page-level components | Common dependency for all pages |
 
-## 4. Gemeinsame Laufzeitdateien
+## Page responsibilities
 
-### 4.1 `app.js`
+| Page | Controller location | Fetches | Main runtime responsibility |
+| --- | --- | --- | --- |
+| `index.html` | `app.js` | instruments, threats, controls, models | Master cockpit view, filters, detail blade, cross-links to Security, Tower, and Runway |
+| `terminal.html` | inline script | terminal guide | Plan selection, IDE setup, first-flight exercises, perspective departures |
+| `security.html` | inline script | instruments, threats, framework registry | X-Ray scanner, framework chip resolution, posture checklist, `#scan=` routing |
+| `jet-bridge.html` | inline script | jet-bridge guide | Prompt craft, context management, edit workflows, agent patterns |
+| `ramp.html` | inline script | instruments | Ramp-specific subset where `perspectives` includes `ramp`; blade opens from `#instrument-<id>` |
+| `runway.html` | inline script | models | Model fleet, plan/provider/status filtering, topology, NOTAMs, model blade, `#model-<id>` |
+| `tower.html` | inline script | governance controls, models, sovereign cloud | Governance registry, sovereignty matrix, provider strategies, flight plans, hash-based highlighting |
+| `flight-log.html` | inline script | changelog | Timeline grouping by year and filters by type and zone |
+| `preflight.html` | inline script | pre-flight checklist | Checklist rendering, progress tracking, `localStorage` persistence, reset |
+| `wiring.html` | inline script | wiring diagram, instruments | Derived Mermaid graph, connection filters, legend, zone cards, graph stats |
 
-`app.js` ist **kein globales App-Framework**, sondern die spezialisierte Cockpit-Laufzeit fuer `index.html`.
+All pages except `index.html` embed their controller logic directly in the HTML file. That keeps deployment simple, but spreads behavior changes across multiple files.
 
-Verifizierte Aufgaben:
+## Standard boot sequence
 
-- laedt `copilot-instruments.json` zwingend und weitere Kataloge optional
-- rendert Zonen in fester Reihenfolge (`ZONE_ORDER`)
-- behandelt `eicas` und `fms` als Spezialzonen
-- oeffnet/schliesst das Detailpanel ueber `#instrument-<id>`
-- erzeugt Cross-Page-Callouts nach `security.html`, `tower.html` und `runway.html`
-- verwaltet Cockpit-Filter, In-Page-Suche, Theme und Browser-History
+The dominant page lifecycle is:
 
-Wichtige Architekturfolge: Aenderungen in `app.js` betreffen nicht nur `index.html`, sondern auch alle Querverweise, die vom Detailpanel in andere Perspektiven fuehren.
+1. Load HTML and `styles.css`.
+2. Read `localStorage['cockpit-theme']` and apply the light theme if present.
+3. Fetch one or more JSON catalogs.
+4. Render DOM sections from the fetched data.
+5. Bind page-specific interactions such as filters, blades, or hash routing.
+6. On most pages, replace the main content area with a `DATA LINK LOST` message if the primary fetch fails.
 
-### 4.2 `search.js`
+## Cockpit-specific architecture
 
-`search.js` ist die einzige echte **querschnittliche Runtime-Datei** neben `styles.css`.
+`index.html` is the densest runtime surface:
 
-Verifizierte Aufgaben:
+1. `DOMContentLoaded` in `app.js` fetches:
+   - `data/copilot-instruments.json`
+   - `data/security-threats.json` as an optional enrichment
+   - `data/governance-controls.json` as an optional enrichment
+   - `data/copilot-models.json` as an optional enrichment
+2. It derives:
+   - `scannerIndex` from `threat.instrumentId`
+   - `governanceIndex` from `control.id`
+   - `_engineModels` from non-deprecated models
+3. It renders 8 zones in a fixed order and treats the `eicas` and `fms` zones specially:
+   - `eicas` renders model links rather than instrument cards
+   - `fms` renders a fixed chain order for instruction and configuration instruments
+4. It manages:
+   - detail blade tabs
+   - cockpit filter buttons
+   - cockpit-local text filter
+   - deep linking through `#instrument-<id>`
+   - theme persistence via `cockpit-theme`
 
-- laedt Instrumente, Controls, Modelle und Changelog-Eintraege
-- behandelt Controls, Modelle und Changelog soft-fail
-- erzeugt Navigationsziele direkt aus Hash-Kontrakten
-- stellt `window.openGlobalSearch()` bereit
-- wird von allen HTML-Seiten eingebunden
+## Cross-page contracts
 
-Architekturfolge: Jede Aenderung an IDs oder Hash-Schemata muss sowohl die Zieldatei als auch `search.js` mitdenken.
+### URL hash contracts
 
-### 4.3 `styles.css`
-
-`styles.css` ist der gemeinsame visuelle Vertrag fuer:
-
-- Layout-Grids
-- Karten und Blades
-- Theme-Wechsel hell/dunkel
-- Suchpalette
-- Perspektivspezifische UI-Bloecke
-
-Da es keinen komponentisierten CSS-Build gibt, wirken Stil-Aenderungen repo-weit.
-
-## 5. Datenfluss und Kopplung
-
-### 5.1 Primaerer Datenfluss
-
-```text
-HTML page -> JS bootstrap -> fetch(data/*.json) -> in-memory state -> rendered DOM
-```
-
-### 5.2 Cross-Page-Datenfluesse
-
-| Quelle | Ziel | Technischer Vertrag |
+| Consumer | Accepted hash | Effect |
 | --- | --- | --- |
-| Cockpit-Detailpanel | `security.html#scan=<instrumentId>` | Security-Scanner oeffnet zu genau diesem Instrument |
-| Cockpit-Detailpanel | `tower.html#control=<instrumentId>` | Governance-Callout verlinkt in die Tower-Control-Liste |
-| Cockpit-EICAS | `runway.html#model-<modelId>` | Modellchips springen in die Runway-Detailansicht |
-| Wiring/Flight Log/Search | `index.html#instrument-<instrumentId>` | Instrument-Deep-Link oeffnet Cockpit-Detailpanel |
-| Search | `tower.html#control=<controlId>` / `runway.html#model-<modelId>` | Suche verlinkt direkt in andere Perspektiven |
+| `index.html` | `#instrument-<instrumentId>` | Opens the cockpit detail blade |
+| `security.html` | `#scan=<instrumentId>` | Loads a specific scanner entry |
+| `ramp.html` | `#instrument-<instrumentId>` | Opens the ramp blade |
+| `runway.html` | `#model-<modelId>` | Opens the model blade |
+| `tower.html` | `#control=<controlId>` | Highlights a governance control row |
+| `tower.html` | `#sovereign=<deploymentOptionId>` | Highlights a sovereignty option |
 
-### 5.3 Soft-Fail vs. Hard-Fail
+These hashes are emitted by page-to-page links, `search.js`, cockpit callouts, and Wiring graph node click handlers.
 
-Verifiziert durch Code:
+### `localStorage` contracts
 
-- `copilot-instruments.json` ist fuer das Cockpit Pflicht; bei Fehler zeigt `app.js` `DATA LINK LOST`.
-- `security-threats.json`, `governance-controls.json` und `copilot-models.json` werden in `app.js` defensiv optional geladen.
-- `search.js` baut seinen Index auch dann weiter, wenn optionale Kataloge fehlen.
+| Key | Owner | Shape | Scope |
+| --- | --- | --- | --- |
+| `cockpit-theme` | almost every page | `"light"` or `"dark"` | cross-page theme |
+| `cockpit-last-scan` | `security.html` | instrument ID string | last selected security scan |
+| `cockpit-security-posture` | `security.html` | JSON object of checkbox state | posture checklist |
+| `copilot-preflight` | `preflight.html` | JSON object of checkbox state | onboarding checklist |
 
-Das reduziert Totalausfaelle, erzeugt aber auch "stille" Teildegradation: einzelne Callouts oder Suchsegmente koennen fehlen, obwohl die Seite bootet.
+Filter state is intentionally not persisted on Cockpit, Runway, or Flight Log.
 
-## 6. Persistenz- und Navigationsvertraege
+## Dependency and failure model
 
-### 6.1 Hash-Vertraege
-
-| Seite | Eingehender Hash | Produzent(en) |
+| Dependency | Required for | Failure effect |
 | --- | --- | --- |
-| `index.html` | `#instrument-<id>` | `app.js`, `ramp.html`, `wiring.html`, `flight-log.html`, `search.js` |
-| `ramp.html` | `#instrument-<id>` | `ramp.html` |
-| `runway.html` | `#model-<id>` | `runway.html`, `search.js`, `app.js` |
-| `security.html` | `#scan=<id>` | `security.html`, `app.js` |
-| `tower.html` | `#control=<id>`, `#sovereign=<id>` | `tower.html`, `search.js`, `app.js` |
+| JSON catalogs under `data/` | core rendering | page fails to render or shows a `DATA LINK LOST` banner |
+| Mermaid CDN | diagrams on Cockpit, Security, Runway, Tower, Wiring | diagram sections degrade |
+| Prism CDN | cockpit code tab highlighting | code still appears, but without syntax highlighting |
+| Google Fonts | visual styling only | font fallback |
+| Vercel Insights scripts | analytics | no effect on core content |
 
-### 6.2 `localStorage`
+## Architecture risks
 
-| Key | Funktion |
+| Risk | Why it matters |
 | --- | --- |
-| `cockpit-theme` | Persisitiert das Theme ueber mehrere Seiten hinweg |
-| `cockpit-last-scan` | Merkt den zuletzt aktiven Security-Scan |
-| `cockpit-security-posture` | Speichert Checkbox-/Posture-Zustand in `security.html` |
-| `copilot-preflight` | Speichert Fortschritt der Pre-Flight-Checkliste |
+| Inline controller sprawl | Theme logic, rendering conventions, and error handling are duplicated across many HTML files |
+| ID-centric linking | Renaming instrument, control, or model IDs breaks hashes, joins, search results, and persisted state |
+| Partial data verification | `data/copilot-models.json` explicitly warns that some values are not yet fully verified |
+| Minimal runtime validation | Browser code assumes catalog keys exist and are shaped correctly |
+| External CDN reliance | Diagrams, code highlighting, and fonts are not fully self-hosted |
 
-## 7. Externe Laufzeitabhaengigkeiten
+## Explicit assumptions
 
-Im Repo selbst liegen nicht alle Runtime-Bausteine:
-
-- Google Fonts fuer die Typografie
-- Mermaid CDN fuer Diagramm-Rendering
-- Prism CDN fuer Syntax-Highlighting
-- Vercel Insights / Speed Insights Skripte
-
-Das Repo ist also statisch, aber nicht komplett offline-selbstgenuegsam.
-
-## 8. Aenderungsfolgen fuer Maintainer
-
-| Wenn du aenderst ... | Revalidiere mindestens ... | Warum |
-| --- | --- | --- |
-| `app.js` | Cockpit, Security-Callout, Tower-Callout, Runway-Bridge, Hash-Verhalten | Das Cockpit ist Integrationshub fuer mehrere Perspektiven. |
-| `search.js` | globale Suche, Ziel-Hashes, Instrument-/Control-/Model-IDs | Die Suche kodiert Ziel-URLs direkt. |
-| `data\copilot-instruments.json` | Cockpit, Ramp, Security, Wiring, Flight Log, Search, `integrity.spec.js` | Instrument-IDs sind Referenzanker ueber das gesamte Repo. |
-| `data\copilot-models.json` | Runway, Tower, Cockpit-EICAS, Search | Modell-IDs und Verfuegbarkeiten propagieren in mehrere Seiten. |
-| `data\governance-controls.json` | Tower, Search, Cockpit-Governance-Callouts, Wiring | Controls sind Ziele fuer Hashes und Graph-Kanten. |
-| Deep-Link-Logik | alle betroffenen Seiten + Search + Playwright | Hashes sind kein Beiwerk, sondern Vertrag. |
-
-## 9. Im Repo nicht explizit belegt
-
-1. **Deploy-Trigger und Rollback-Prozess.** `vercel.json` zeigt die Auslieferungsform, nicht aber wer oder was deployt.
-2. **Zentrales Incident-Handling.** Das Repo zeigt Fehlerbilder im Browser und Testschutz, aber kein eigenes Alerting-/Monitoring-System.
-
-Diese Punkte gehoeren deshalb nach [OPERATIONS.md](OPERATIONS.md) nur als Annahmen oder Lueckenbeschreibung, nicht als harte Behauptung.
+- The static architecture appears intentional because the repository contains direct HTML entry points, shared browser scripts, and `vercel.json`, but no build pipeline or generated output folder.
+- Relative fetch paths such as `data/copilot-models.json` assume the site is served from the repository root or an equivalent static root.
