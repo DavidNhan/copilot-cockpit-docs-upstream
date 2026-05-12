@@ -1,86 +1,107 @@
 # Data Catalog
 
-## 1. Kataloguebersicht
+## 1. Catalog overview
 
-Alle produktiven Inhaltsdaten liegen unter `C:\temp\copilot-cockpit\data\`.
+The site is data-driven. Browser code renders most content from `data\*.json` instead of hard-coding text into page templates.
 
-| Datei | Primaere Collections/Objekte | Hauptkonsumenten | Verifikationshinweis |
-| --- | --- | --- | --- |
-| `copilot-instruments.json` | `zones[]`, `plans[]`, `instruments[]` | Cockpit, Ramp, Security, Wiring, Search | Kein explizites `verificationRequired`; Referenzen werden durch `tests\integrity.spec.js` abgesichert |
-| `copilot-models.json` | `sources[]`, `capabilities[]`, `surfaces[]`, `plans[]`, `models[]`, `notams[]`, `flightPlans[]`, `copilotEngine` | Runway, Tower, Cockpit, Search | `verificationRequired: true` |
-| `governance-controls.json` | `sources`, `controls[]` | Tower, Cockpit, Search | `verificationRequired: false` |
-| `sovereign-cloud.json` | `sovereignPillars[]`, `deploymentOptions[]`, `providerStrategies[]`, `residualRisks[]`, `dataFlowDiagram` | Tower | Keine explizite Verifikationsflagge |
-| `security-threats.json` | `schema`, `threats[]` | Security, Cockpit | Keine explizite Verifikationsflagge |
-| `security-frameworks.json` | `sources`, `frameworks`, `cwePattern` | Security | `verificationRequired: true` |
-| `terminal-guide.json` | `checkIn`, `boardingPass`, `firstFlight`, `departures` | Terminal | Keine explizite Verifikationsflagge |
-| `jet-bridge-guide.json` | `promptCraft`, `contextManagement`, `editMode`, `agentPatterns`, `nextSteps` | Jet Bridge | Keine explizite Verifikationsflagge |
-| `known-changelog-entries.json` | `entryTypes`, `entries[]` | Flight Log, Search, Integrity-Tests | Keine explizite Verifikationsflagge |
-| `preflight-checklist.json` | `intro`, `categories[]` | Pre-Flight | Keine explizite Verifikationsflagge |
-| `wiring-diagram.json` | `connectionTypes[]`, `connections[]`, `zoneDescriptions` | Wiring, Integrity-Tests | Keine explizite Verifikationsflagge |
+| File | Current size of main collection | Consumed by | Verification flag |
+| --- | ---: | --- | --- |
+| `data\copilot-instruments.json` | 46 instruments | `app.js`, `security.html`, `ramp.html`, `search.js`, `wiring.html` | none |
+| `data\copilot-models.json` | 21 models | `app.js`, `runway.html`, `tower.html`, `search.js` | `verificationRequired: true` |
+| `data\governance-controls.json` | 20 controls | `app.js`, `tower.html`, `search.js` | `verificationRequired: false` |
+| `data\security-threats.json` | 23 threats | `app.js`, `security.html` | none |
+| `data\security-frameworks.json` | framework registries | `security.html` | `verificationRequired: true` |
+| `data\sovereign-cloud.json` | 6 deployment options, 3 residual risks | `tower.html` | none |
+| `data\terminal-guide.json` | 4 page sections | `terminal.html` | none |
+| `data\jet-bridge-guide.json` | 5 page sections | `jet-bridge.html` | none |
+| `data\preflight-checklist.json` | 6 categories, 22 items | `preflight.html` | none |
+| `data\known-changelog-entries.json` | 35 entries | `flight-log.html`, `search.js` | none |
+| `data\wiring-diagram.json` | 55 connections, 4 types | `wiring.html` | none |
 
-## 2. Dateispezifische Vertrage
+## 2. File-by-file schema notes
 
-### 2.1 `copilot-instruments.json`
+### 2.1 `data\copilot-instruments.json`
 
-Pfad: `C:\temp\copilot-cockpit\data\copilot-instruments.json`
+Purpose:
 
-Technischer Vertrag:
+- master content source for cockpit instruments
+- source of zones and plans
+- source of cross-page ids
 
-- `zones[]`: 8 definierte Zonen
-- `plans[]`: 5 Plaene (`free`, `pro`, `pro-plus`, `business`, `enterprise`)
-- `instruments[]`: kanonische Instrumentdefinitionen fuer das Cockpit
+Top-level keys:
 
-Wichtige Felder pro Instrument:
+- `version`
+- `lastUpdated`
+- `zones[]`
+- `plans[]`
+- `instruments[]`
 
-- `id`
-- `symbol`
-- `name`
-- `zone`
-- `status`
-- `perspectives`
-- `planAvailability`
-- optionale Felder wie `capabilities`, `ideSupport`, `relatedInstruments`, `codeExamples`, `mermaidDiagrams`, `terminalRecordings`
+Important nested structures inside `instruments[]`:
 
-Abhaengigkeiten:
+- identity: `id`, `symbol`, `name`, `zone`, `perspectives`, `status`
+- availability: `planAvailability`, `ideSupport`, `flightMode`
+- content: `description`, `shortDescription`, `capabilities`, `squawkCodes`, `proTip`
+- relationships: `relatedInstruments`
+- rich media: `mermaidDiagrams`, `codeExamples`, `terminalRecordings`, `videos`
+- references: `links`
+- quality markers: `lastVerified`, `confidenceScore`
 
-- `security-threats.json.threats[].instrumentId`
-- `known-changelog-entries.json.entries[].instruments[]`
-- `wiring-diagram.json.connections[].from|to`
+Consumers:
 
-### 2.2 `copilot-models.json`
+- `app.js` renders cards, detail tabs, plan/IDE rows, related links, and cockpit callouts
+- `ramp.html` filters on `perspectives.includes('ramp')`
+- `security.html` joins `threat.instrumentId` to instrument metadata
+- `wiring.html` uses zone and instrument metadata for graph labels and zone summaries
+- `search.js` indexes instruments for global search
 
-Pfad: `C:\temp\copilot-cockpit\data\copilot-models.json`
+### 2.2 `data\copilot-models.json`
 
-Technischer Vertrag:
+Purpose:
 
-- `$schema`: zeigt auf `./schema/copilot-models.schema.json`
-- `verificationRequired: true`
-- `models[]`: derzeit testseitig indirekt als 21 sichtbare Modelle abgesichert (`tests\runway.spec.js`)
-- `notams[]`: testseitig als 5 Eintraege abgesichert
-- `flightPlans[]`: testseitig als 5 Karten abgesichert
+- authoritative model fleet for Runway
+- derived engine-zone content for the cockpit page
+- Tower flight plans
+- search indexing
 
-Beobachtete Upstream-Quellen im Datensatz:
+Top-level keys currently used by code:
 
-- GitHub Docs - Model comparison
-- GitHub Docs - Supported models
-- GitHub Docs - Copilot plans
+- metadata: `$schema`, `version`, `lastUpdated`, `verificationRequired`, `verificationNotes`, `description`
+- reference lists: `sources[]`, `capabilities[]`, `surfaces[]`, `plans[]`
+- main content: `models[]`
+- runway/tower content: `notams[]`, `copilotEngine`, `flightPlans[]`
 
-Offline-Herkunft:
+Important nested structures inside `models[]`:
 
-- `tools\enrich\README.md`
-- `tools\enrich\sources.yml`
+- identity: `id`, `displayName`, `provider`, `family`, `status`
+- availability: `surfaceAvailability`, `planAvailability`, `modeAvailability`, `ideAvailability`
+- evaluation: `strengths`, `limitations`, `capabilities`, `taskFit`, `taskArea`, `excelsAt`
+- metadata: `contextWindow`, `releasedAt`, `knowledgeCutoff`, `pricingMultiplier`
+- quality markers: `confidenceScore`, `lastVerified`, `verificationRequired`
 
-### 2.3 `governance-controls.json`
+Operational note:
 
-Pfad: `C:\temp\copilot-cockpit\data\governance-controls.json`
+- `app.js` derives cockpit engine-zone links from non-deprecated models and maps them into `_engineModels`
+- `runway.html` treats `verificationRequired` as a UI banner condition
 
-Technischer Vertrag:
+### 2.3 `data\governance-controls.json`
 
-- `verificationRequired: false`
-- `sources`: 6 Framework-Quellen (`soc2`, `iso27001`, `gdpr`, `hipaa`, `fedramp`, `euAiAct`)
-- `controls[]`: testseitig als 20 Controls abgesichert
+Purpose:
 
-Jede Control enthaelt mindestens:
+- governance registry for Tower
+- search index for controls
+- cockpit governance callout source
+- wiring graph endpoints
+
+Top-level keys:
+
+- `version`
+- `lastUpdated`
+- `verificationRequired`
+- `description`
+- `sources`
+- `controls[]`
+
+Important keys in `controls[]`:
 
 - `id`
 - `category`
@@ -90,138 +111,209 @@ Jede Control enthaelt mindestens:
 - `governanceNote`
 - `complianceRelevance[]`
 
-### 2.4 `sovereign-cloud.json`
+### 2.4 `data\security-threats.json`
 
-Pfad: `C:\temp\copilot-cockpit\data\sovereign-cloud.json`
+Purpose:
 
-Technischer Vertrag:
+- scanner content for Security page
+- cockpit security callout index
 
-- `sovereignPillars[]`: testseitig 3 Eintraege
-- `deploymentOptions[]`: testseitig 6 Optionen
-- `providerStrategies[]`: testseitig 4 Strategien
-- `residualRisks[]`: testseitig 3 Risiken
-- `dataFlowDiagram`: Mermaid-Quelltext fuer Tower
+Top-level keys:
 
-### 2.5 `security-threats.json`
+- `version`
+- `lastUpdated`
+- `description`
+- `schema`
+- `threats[]`
 
-Pfad: `C:\temp\copilot-cockpit\data\security-threats.json`
+Each threat record binds to `copilot-instruments.json` by `instrumentId`.
 
-Technischer Vertrag gemaess eingebettetem `schema`:
+Important fields:
 
-- `instrumentId`
-- `classification`
-- `cia[]`
-- `threatModel`
-- `scenario`
-- `demo`
-- `countermeasures[]`
-- `blastRadius`
-- `mitigatesCWE[]`
+- classification metadata: `classification`, `cia[]`, `blastRadius`
+- scenario content: `threatModel`, `scenario`, `demo`, `countermeasures[]`
+- compliance/security links: `mitigatesCWE[]`, `frameworks`
 
-Die Datei ist direkt mit `copilot-instruments.json` gekoppelt.
+### 2.5 `data\security-frameworks.json`
 
-### 2.6 `security-frameworks.json`
+Purpose:
 
-Pfad: `C:\temp\copilot-cockpit\data\security-frameworks.json`
+- lookup registry for framework badges on the Security page
 
-Technischer Vertrag:
+Top-level keys:
 
-- `verificationRequired: true`
-- `sources.owasp-llm`
-- `sources.mitre-atlas`
-- `sources.cwe`
-- `frameworks.owaspLLM`
-- `frameworks.atlas`
-- `cwePattern.urlTemplate`
+- `version`
+- `lastUpdated`
+- `verificationRequired`
+- `description`
+- `sources`
+- `frameworks`
+- `cwePattern`
 
-Diese Datei ist bewusst als teilweise unbestaetigt markiert und muss als Annahme behandelt werden, solange `verified: false` bzw. `lastVerified: null` gesetzt ist.
+Important behavior:
 
-### 2.7 `terminal-guide.json`
+- Security page resolves `frameworks.owaspLLM[...]` and `frameworks.atlas[...]`
+- CWE links are generated through `cwePattern.urlTemplate`
 
-Pfad: `C:\temp\copilot-cockpit\data\terminal-guide.json`
+### 2.6 `data\sovereign-cloud.json`
 
-Testseitig abgesicherte Struktur:
+Purpose:
 
-- 5 Plan-Karten
-- 6 IDE-Karten
-- 3 Exercise-Karten
-- 5 Departure-Links
+- Tower sovereignty section
 
-### 2.8 `jet-bridge-guide.json`
+Important top-level arrays/objects:
 
-Pfad: `C:\temp\copilot-cockpit\data\jet-bridge-guide.json`
+- `sovereignPillars[]`
+- `deploymentOptions[]`
+- `providerStrategies[]`
+- `residualRisks[]`
+- `dataFlowDiagram`
 
-Testseitig abgesicherte Struktur:
+`deploymentOptions[]` contains structured `dataFlows` objects for:
 
-- 6 Prompt-Techniken
-- 3 Participant-Karten
-- 3 Variable-Karten
-- 3 Edit-Workflows
-- 5 Agent-Patterns
-- 5 Next-Step-Links
+- `inMotion`
+- `inUse`
+- `atRest`
 
-### 2.9 `known-changelog-entries.json`
+### 2.7 `data\terminal-guide.json`
 
-Pfad: `C:\temp\copilot-cockpit\data\known-changelog-entries.json`
+Purpose:
 
-Technischer Vertrag:
+- content source for `terminal.html`
 
-- `entryTypes`: 6 Typen (`departure`, `cleared`, `upgrade`, `notam`, `grounded`, `turbulence`)
-- `entries[]`: Timeline-Eintraege mit `id`, `date`, `type`, `title`, `description`, `instruments[]`, `zone`, `source`
+Top-level page sections:
 
-Integritaetsvertrag:
+- `checkIn`
+- `boardingPass`
+- `firstFlight`
+- `departures`
 
-- Jeder Typ in `entries[].type` muss in `entryTypes` definiert sein.
-- Jede Instrument-Referenz in `entries[].instruments[]` muss in `copilot-instruments.json` existieren.
+### 2.8 `data\jet-bridge-guide.json`
 
-### 2.10 `preflight-checklist.json`
+Purpose:
 
-Pfad: `C:\temp\copilot-cockpit\data\preflight-checklist.json`
+- content source for `jet-bridge.html`
 
-Testseitig abgesicherte Struktur:
+Top-level page sections:
 
-- 6 Kategorien
-- Kategorien enthalten `perspective`-Links auf HTML-Seiten
-- Item-Zustaende werden nicht im JSON selbst, sondern in `localStorage['copilot-preflight']` gespeichert
+- `promptCraft`
+- `contextManagement`
+- `editMode`
+- `agentPatterns`
+- `nextSteps`
 
-### 2.11 `wiring-diagram.json`
+### 2.9 `data\preflight-checklist.json`
 
-Pfad: `C:\temp\copilot-cockpit\data\wiring-diagram.json`
+Purpose:
 
-Technischer Vertrag:
+- checklist content and routing metadata for `preflight.html`
 
-- `connectionTypes[]`: 4 Typen (`context`, `powers`, `governs`, `extends`)
-- `connections[]`: Kanten mit `from`, `to`, `type`, `label`
-- `zoneDescriptions`: optionale Textueberschreibung pro Zone
+Top-level keys:
 
-Integritaetsvertrag:
+- `version`
+- `lastUpdated`
+- `description`
+- `intro`
+- `categories[]`
 
-- `connections[].type` muss in `connectionTypes[].id` enthalten sein.
-- `connections[].from` und `connections[].to` muessen auf bekannte Instrumente oder Controls zeigen.
+Each category includes:
 
-## 3. Datenquellen ausserhalb von `data\`
+- `id`
+- `title`
+- `icon`
+- `perspective` (HTML path)
+- `items[]`
 
-| Quelle | Pfad | Rolle |
-| --- | --- | --- |
-| Model-Enrichment-Registry | `C:\temp\copilot-cockpit\tools\enrich\sources.yml` | Definiert Upstream-Quellen fuer Modellanreicherung |
-| Model-Enrichment-Dokumentation | `C:\temp\copilot-cockpit\tools\enrich\README.md` | Beschreibt Harvest-/Normalize-Vertrag und Schreibverbot direkt nach `data\` |
-| Deployment-Header | `C:\temp\copilot-cockpit\vercel.json` | Bestimmt Cache-Verhalten fuer `data\*.json` |
+Each item includes:
 
-## 4. Testbezug
+- `id`
+- `label`
+- `detail`
 
-Zentrale Datenvertraege werden durch `C:\temp\copilot-cockpit\tests\integrity.spec.js` abgesichert:
+### 2.10 `data\known-changelog-entries.json`
 
-- gueltige Changelog-zu-Instrument-Referenzen
-- gueltige Wiring-Endpunkte
-- gueltige `relatedInstruments`
-- keine doppelten Instrument-IDs
-- Pflichtfelder pro Instrument
-- gueltige Zonen
-- gueltige Changelog-Typen
-- gueltige Wiring-Typen
-- keine doppelten Model-IDs
+Purpose:
 
-## 5. Annahmen
+- flight-log timeline
+- search index for changelog records
 
-1. **Instrumentanzahl wird nicht fest fixiert:** Mehrere Freitexte im Repository nennen unterschiedliche Summen. Fuer diesen Katalog wird deshalb der Strukturvertrag dokumentiert, nicht eine aus Prosa abgeleitete exakte Anzahl.
-2. **Model- und Framework-Frische ist teilweise offen:** `copilot-models.json` und `security-frameworks.json` markieren selbst, dass Inhalte noch nicht voll verifiziert sind. Diese Unsicherheit ist Teil des Datenvertrags und kein Dokumentationsfehler.
+Top-level keys:
+
+- `version`
+- `lastUpdated`
+- `entryTypes`
+- `entries[]`
+
+Each entry includes:
+
+- `id`
+- `date`
+- `type`
+- `title`
+- `description`
+- `instruments[]`
+- `zone`
+- `source`
+
+### 2.11 `data\wiring-diagram.json`
+
+Purpose:
+
+- graph and legend source for `wiring.html`
+
+Top-level keys:
+
+- `version`
+- `lastUpdated`
+- `description`
+- `intro`
+- `connectionTypes[]`
+- `connections[]`
+- `zoneDescriptions`
+
+`connections[]` records use:
+
+- `from`
+- `to`
+- `type`
+- `label`
+
+`from` and `to` may reference either instrument ids or governance control ids.
+
+## 3. Cross-file relationships
+
+| Relationship | Meaning |
+| --- | --- |
+| `security-threats.instrumentId -> copilot-instruments.instruments.id` | threat records resolve to instrument metadata |
+| `known-changelog-entries.entries[].instruments[] -> copilot-instruments.instruments.id` | changelog entries link back to cockpit instruments |
+| `copilot-instruments.relatedInstruments[] -> copilot-instruments.instruments.id` | cockpit related-link graph |
+| `wiring-diagram.connections[].from/to -> instruments.id or governance-controls.id` | mixed graph of product features and admin controls |
+
+## 4. Validation coverage
+
+`tests\integrity.spec.js` validates:
+
+- duplicate instrument ids
+- duplicate model ids
+- required instrument fields
+- valid zone references
+- valid changelog entry types
+- valid wiring connection types
+- cross-file foreign-key integrity
+
+This is the repository's strongest automated guard against data drift.
+
+## 5. Data maintenance workflow
+
+Model data has an additional optional maintenance path:
+
+- `tools\enrich\harvest.py` caches upstream payloads under `tools\cache\`
+- `tools\enrich\normalize.py` produces a merged candidate catalog
+- final updates are expected to be applied manually
+
+No equivalent enrichment pipeline exists in the repository for the other JSON catalogs.
+
+## 6. Assumptions and uncertainty
+
+- **Assumption:** Counts listed above are repository-source counts, not deployment-time counts after any external preprocessing.
+- `data\copilot-models.json` and `data\security-frameworks.json` explicitly flag verification uncertainty inside the files; preserve that uncertainty when using their contents operationally.
